@@ -170,7 +170,11 @@ jobs:
         run: |
           set -euo pipefail
           kubectl version --client
-          kubectl version --client | grep -q "Client Version: ${KUBECTL_VERSION}"
+          # Do not pipe into `grep -q`: it exits early, kubectl takes SIGPIPE,
+          # and pipefail turns the pipeline into exit 141.
+          client_version="$(kubectl version --client -o jsonpath='{.clientVersion.gitVersion}')"
+          echo "kubectl client version: ${client_version}"
+          test "${client_version}" = "${KUBECTL_VERSION}"
 
       - name: Render dev overlay and split prerequisites
         run: |
