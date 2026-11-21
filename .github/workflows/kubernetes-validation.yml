@@ -160,6 +160,17 @@ jobs:
           node_image: ${{ env.KIND_NODE_IMAGE }}
           cluster_name: talent-ai-dev
           config: infrastructure/k8s/kind/kind-config.yaml
+          # kind-action installs its own kubectl (v1.31.4 by default) and
+          # prepends it to PATH, shadowing the pinned v1.35.8 from
+          # azure/setup-kubectl. That older kubectl embeds kustomize v5.4.2,
+          # which panics on multi-document `$patch: delete` patch files.
+          kubectl_version: ${{ env.KUBECTL_VERSION }}
+
+      - name: Verify kubectl matches pinned baseline
+        run: |
+          set -euo pipefail
+          kubectl version --client
+          kubectl version --client | grep -q "Client Version: ${KUBECTL_VERSION}"
 
       - name: Render dev overlay and split prerequisites
         run: |

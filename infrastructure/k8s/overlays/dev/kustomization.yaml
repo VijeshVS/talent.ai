@@ -80,7 +80,19 @@ patches:
 
   # dev runs single-replica Deployments; a PDB with minAvailable: 1 would block
   # every node drain. The objects are removed rather than weakened.
-  - path: delete-pdbs.yaml
+  #
+  # One delete directive per file: kustomize < 5.5 panics when a single patch
+  # file contains more than one `$patch: delete` document (nil resource in the
+  # resmap). Splitting keeps the overlay renderable on older kubectl builds.
+  - path: delete-pdbs/api-gateway.yaml
+  - path: delete-pdbs/auth-service.yaml
+  - path: delete-pdbs/talent-service.yaml
+  - path: delete-pdbs/recruiter-service.yaml
+  - path: delete-pdbs/engagement-service.yaml
+  - path: delete-pdbs/rewards-service.yaml
+  - path: delete-pdbs/ai-matching-service.yaml
+  - path: delete-pdbs/notification-service.yaml
+  - path: delete-pdbs/analytics-service.yaml
   - path: resources/api-gateway.yaml
   - path: resources/auth-service.yaml
   - path: resources/talent-service.yaml

@@ -1,4 +1,4 @@
-﻿# Kubernetes platform
+# Kubernetes platform
 
 Phase 12 platform foundation for talent.ai. The full design, rationale and
 verification record are in
@@ -8,10 +8,10 @@ verification record are in
 
 | Layer | Authored source | Rendered by |
 | :--- | :--- | :--- |
-| Workloads â€” 9 Deployments, 9 Services, 9 HPAs | `helm/talent-ai` | `base/workloads/workloads.generated.yaml` |
-| Platform â€” namespaces, RBAC, config, networking, policy | `base/**` | `base/kustomization.yaml` |
+| Workloads — 9 Deployments, 9 Services, 9 HPAs | `helm/talent-ai` | `base/workloads/workloads.generated.yaml` |
+| Platform — namespaces, RBAC, config, networking, policy | `base/**` | `base/kustomization.yaml` |
 | Environment differences | `overlays/<env>` | that overlay |
-| Observability â€” Prometheus, Grafana | `observability/*.yaml` (Phase 11, unchanged) | `observability/kustomization.yaml` |
+| Observability — Prometheus, Grafana | `observability/*.yaml` (Phase 11, unchanged) | `observability/kustomization.yaml` |
 
 `base/workloads/workloads.generated.yaml` is **generated**. Do not edit it by
 hand; change the chart and run `pnpm k8s:sync-workloads`. CI fails if the
@@ -20,10 +20,10 @@ committed file is stale.
 ## Apply
 
 ```bash
-# local / dev â€” the only deployable render
+# local / dev — the only deployable render
 kubectl apply -k infrastructure/k8s/overlays/dev
 
-# staging / production â€” replace the sha256:0000â€¦ digest placeholders first
+# staging / production — replace the sha256:0000… digest placeholders first
 kubectl apply -k infrastructure/k8s/overlays/staging
 kubectl apply -k infrastructure/k8s/overlays/production
 ```
@@ -103,6 +103,11 @@ Jobs:
 - **validate**: install pinned tools (checksums verified), render all overlays, run Helm lint/template (default + dev/staging/production values), run strict Kubeconform against configured Kubernetes schema versions, run rendered-manifest checks, then run `pnpm k8s:validate` (conftest/quota/drift/render checks).
 - **server-dry-run**: create a pinned kind cluster, render/split dev overlay, apply namespace/PriorityClass prerequisites and dummy ConfigMap/Secret for admission, then run `kubectl apply --dry-run=server -k infrastructure/k8s/overlays/dev`.
 
+`helm/kind-action` installs its own kubectl (v1.31.4 by default) and prepends it
+to `PATH`. The workflow passes `kubectl_version` so the action installs the
+pinned v1.35.8 instead, and a follow-up step asserts the client version. Without
+that, the job silently renders with kustomize v5.4.2.
+
 CI does not deploy to production and uses no production credentials. GitHub Actions permissions are `contents: read`.
 
 ## Troubleshooting
@@ -116,25 +121,26 @@ CI does not deploy to production and uses no production credentials. GitHub Acti
 | `Secret ... not found` in dry-run/runtime | Secret not created | Create `talent-ai-secrets` from example via secret manager; do not commit plaintext |
 | Dry-run `namespaces ... not found` | Fresh cluster, namespaced objects applied before Namespace | Apply namespaces/PriorityClasses first, or use split-render pattern |
 | Helm kubeVersion error | Local Helm default version too old/new | Pass `--kube-version 1.35.8` (or pinned baseline) |
+| `kubectl kustomize` panics with `nil pointer dereference` | kubectl embeds kustomize < 5.5 (e.g. kubectl v1.31 embeds v5.4.2) and a patch file has multiple `$patch: delete` docs | Use the pinned kubectl v1.35.8; in kind jobs pass `kubectl_version` so kind-action does not shadow it |
 | Conftest failure | Security/RBAC/resource policy violation | Read rego message, fix manifest/chart, rerun `pnpm k8s:validate` |
 
 ## Layout
 
 ```text
 k8s/
-â”œâ”€â”€ versions.env            # pinned tool versions and checksums
-â”œâ”€â”€ base/
-â”‚   â”œâ”€â”€ namespaces/         # talent-ai, talent-ai-platform, talent-ai-data
-â”‚   â”œâ”€â”€ rbac/               # 9 workload SAs, deployer + admin Roles
-â”‚   â”œâ”€â”€ config/             # ConfigMap + Secret templates
-â”‚   â”œâ”€â”€ workloads/          # generated from the chart
-â”‚   â”œâ”€â”€ networking/         # Ingress, 18 NetworkPolicies, quarantined portal rules
-â”‚   â””â”€â”€ policies/           # ResourceQuota, LimitRange, 9 PDBs, 2 PriorityClasses
-â”œâ”€â”€ overlays/{dev,staging,production}/
-â”œâ”€â”€ helm/talent-ai/         # workload chart (source of truth)
-â”œâ”€â”€ kind/kind-config.yaml   # pinned node image
-â”œâ”€â”€ policies/rego/          # conftest policy
-â””â”€â”€ observability/          # Phase 11 Prometheus + Grafana
++-- versions.env            # pinned tool versions and checksums
++-- base/
+|   +-- namespaces/         # talent-ai, talent-ai-platform, talent-ai-data
+|   +-- rbac/               # 9 workload SAs, deployer + admin Roles
+|   +-- config/             # ConfigMap + Secret templates
+|   +-- workloads/          # generated from the chart
+|   +-- networking/         # Ingress, 18 NetworkPolicies, quarantined portal rules
+|   `-- policies/           # ResourceQuota, LimitRange, 9 PDBs, 2 PriorityClasses
++-- overlays/{dev,staging,production}/
++-- helm/talent-ai/         # workload chart (source of truth)
++-- kind/kind-config.yaml   # pinned node image
++-- policies/rego/          # conftest policy
+`-- observability/          # Phase 11 Prometheus + Grafana
 ```
 
 ## Things to know
