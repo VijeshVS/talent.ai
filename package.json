@@ -53,6 +53,10 @@
     "db:seed:realistic": "pnpm --filter @talent-ai/realistic-seeder seed:realistic",
     "db:seed:realistic:reset": "pnpm --filter @talent-ai/realistic-seeder seed:realistic:reset",
     "dashboards:generate": "node scripts/generate-grafana-dashboards.mjs",
+    "k8s:render": "node scripts/k8s/render.mjs",
+    "k8s:sync-workloads": "node scripts/k8s/sync-workloads.mjs",
+    "k8s:validate": "node scripts/k8s/validate.mjs",
+    "k8s:quota": "node scripts/k8s/quota-report.mjs",
     "legacy:candidate": "node candidate/backend/index.js",
     "legacy:recruiter": "node hr/backend/index.js",
     "db:migrate:seed": "node scripts/migrate-monolith-to-microservices.mjs"
@@ -61,7 +65,8 @@
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "prettier": "^3.4.2",
-    "turbo": "^2.3.3"
+    "turbo": "^2.3.3",
+    "yaml": "^2.9.1"
   },
   "pnpm": {
     "onlyBuiltDependencies": [

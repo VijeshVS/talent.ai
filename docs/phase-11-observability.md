@@ -70,7 +70,7 @@ kubectl -n talent-ai port-forward svc/prometheus 9090:9090
 `infrastructure/kustomization.yaml` generates the
 `talent-ai-grafana-dashboards` and `talent-ai-prometheus-rules` ConfigMaps from
 the Compose files, so there is no copy to drift. Create the Grafana admin secret
-from `infrastructure/k8s/secret.grafana.example.yaml` and add the analytics
+from `infrastructure/k8s/base/config/secret.grafana.example.yaml` and add the analytics
 datasource credentials to `talent-ai-secrets`.
 
 ## Alerts and runbooks

@@ -1,18 +1,21 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
-# Phase 11 — apply the application and its observability stack together:
+# Legacy entrypoint preserved:
 #
 #   kubectl apply -k infrastructure
 #
-# The dashboards and alert rules are generated from the same files that Docker
-# Compose mounts, so there is one version-controlled source of truth.
-namespace: talent-ai
+# Renders the production platform overlay plus the Phase 11 observability stack
+# and the generated dashboard/rule ConfigMaps. The global `namespace:` and
+# `images:` transformers were removed in Phase 12: namespaces are explicit per
+# object, and image references are owned by the overlays.
+#
+# NOTE: production images are digest placeholders until the release workflow
+# writes real digests. Use k8s/overlays/dev for a deployable local render.
 
 resources:
-  - k8s
-  - k8s/observability/prometheus.yaml
-  - k8s/observability/grafana.yaml
+  - k8s/overlays/production
+  - k8s/observability
 
 configMapGenerator:
   - name: talent-ai-grafana-dashboards
@@ -31,8 +34,21 @@ configMapGenerator:
     options:
       disableNameSuffixHash: true
 
-labels:
-  - pairs:
-      app.kubernetes.io/managed-by: kustomize
-      app.kubernetes.io/part-of: talent-ai
-    includeSelectors: false
+# The generators above produce namespace-less ConfigMaps. Set the namespace
+# explicitly instead of reintroducing a global transformer that would override
+# the platform/data namespaces.
+patches:
+  - target:
+      kind: ConfigMap
+      name: talent-ai-grafana-dashboards
+    patch: |-
+      - op: add
+        path: /metadata/namespace
+        value: talent-ai
+  - target:
+      kind: ConfigMap
+      name: talent-ai-prometheus-rules
+    patch: |-
+      - op: add
+        path: /metadata/namespace
+        value: talent-ai
