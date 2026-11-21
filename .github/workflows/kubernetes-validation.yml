@@ -169,12 +169,13 @@ jobs:
       - name: Verify kubectl matches pinned baseline
         run: |
           set -euo pipefail
-          kubectl version --client
-          # Do not pipe into `grep -q`: it exits early, kubectl takes SIGPIPE,
-          # and pipefail turns the pipeline into exit 141.
-          client_version="$(kubectl version --client -o jsonpath='{.clientVersion.gitVersion}')"
-          echo "kubectl client version: ${client_version}"
-          test "${client_version}" = "${KUBECTL_VERSION}"
+          output="$(kubectl version --client)"
+          echo "$output"
+          if [[ "$output" != *"Client Version: ${KUBECTL_VERSION}"* ]]; then
+            echo "kubectl client is not the pinned baseline: ${KUBECTL_VERSION}" >&2
+            exit 1
+          fi
+          echo "kubectl client matches pinned baseline"
 
       - name: Render dev overlay and split prerequisites
         run: |
