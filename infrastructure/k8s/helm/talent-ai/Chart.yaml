@@ -1,0 +1,15 @@
+apiVersion: v2
+name: talent-ai
+description: >-
+  Renders the nine talent.ai application Deployments, Services and
+  HorizontalPodAutoscalers. This chart does NOT create namespaces,
+  ServiceAccounts, RBAC, ConfigMaps, Secrets, Ingress, NetworkPolicies,
+  ResourceQuota, LimitRange, PodDisruptionBudgets or PriorityClasses. It
+  depends on ConfigMap/talent-ai-config and Secret/talent-ai-secrets already
+  existing in the target namespace. A standalone `helm install` therefore
+  renders pods that fail on missing configuration. The supported Phase 12 path
+  is `kubectl apply -k infrastructure/k8s/overlays/<env>`.
+type: application
+version: 0.1.0
+appVersion: '0.1.0'
+kubeVersion: '>=1.35.0-0 <1.38.0-0'

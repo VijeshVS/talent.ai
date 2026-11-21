@@ -1,0 +1,23 @@
+# Base quota = the dev profile. Each overlay patches the hard values to its own
+# derivation in docs/phase-12-kubernetes-platform.md §8.3.3.
+#
+#   dev         3 CPU /  6Gi requests   15 CPU / 15Gi limits   29 pods
+#   staging     4 CPU /  8Gi requests   21 CPU / 20Gi limits   40 pods
+#   production  5 CPU /  9Gi requests   25 CPU / 25Gi limits   49 pods
+#
+# ResourceQuota is aggregate-only. It does not guarantee per-node schedulability;
+# see scripts/k8s/quota-report.mjs for the per-node check.
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: talent-ai-quota
+  namespace: talent-ai
+  labels:
+    app.kubernetes.io/part-of: talent-ai
+spec:
+  hard:
+    requests.cpu: '3'
+    requests.memory: 6Gi
+    limits.cpu: '15'
+    limits.memory: 15Gi
+    pods: '29'

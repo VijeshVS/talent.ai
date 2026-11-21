@@ -1,0 +1,26 @@
+# PriorityClass affects scheduler ordering, preemption, and kubelet eviction
+# ordering under node pressure. It does not protect against voluntary
+# disruptions; that is the PDB's job. The two are not interchangeable.
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: talent-ai-critical
+  labels:
+    app.kubernetes.io/part-of: talent-ai
+value: 1000000
+globalDefault: false
+description: >-
+  talent.ai edge and authentication workloads. Last to lose capacity under
+  node-pressure eviction and scheduler preemption.
+---
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: talent-ai-standard
+  labels:
+    app.kubernetes.io/part-of: talent-ai
+value: 100000
+globalDefault: false
+description: >-
+  talent.ai application workloads. Explicit so no pod relies on the default
+  priority.

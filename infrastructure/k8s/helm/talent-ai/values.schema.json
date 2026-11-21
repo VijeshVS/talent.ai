@@ -1,0 +1,135 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "talent-ai workload chart values",
+  "type": "object",
+  "required": [
+    "namespace",
+    "image",
+    "services"
+  ],
+  "properties": {
+    "namespace": {
+      "type": "string",
+      "minLength": 1
+    },
+    "image": {
+      "type": "object",
+      "required": [
+        "registry",
+        "tag",
+        "pullPolicy"
+      ],
+      "properties": {
+        "registry": {
+          "type": "string",
+          "minLength": 1
+        },
+        "tag": {
+          "type": "string"
+        },
+        "pullPolicy": {
+          "type": "string",
+          "enum": [
+            "Always",
+            "IfNotPresent",
+            "Never"
+          ]
+        },
+        "digest": {
+          "type": "string"
+        }
+      }
+    },
+    "configMapName": {
+      "type": "string"
+    },
+    "secretName": {
+      "type": "string"
+    },
+    "podSecurityContext": {
+      "type": "object"
+    },
+    "containerSecurityContext": {
+      "type": "object"
+    },
+    "topologySpread": {
+      "type": "object"
+    },
+    "defaults": {
+      "type": "object"
+    },
+    "services": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {
+        "type": "object",
+        "required": [
+          "port",
+          "component",
+          "hpa"
+        ],
+        "properties": {
+          "port": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 65535
+          },
+          "component": {
+            "type": "string",
+            "enum": [
+              "backend",
+              "edge"
+            ]
+          },
+          "replicas": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "sessionAffinity": {
+            "type": "string"
+          },
+          "env": {
+            "type": "array"
+          },
+          "resources": {
+            "type": "object"
+          },
+          "readinessProbe": {
+            "type": "object"
+          },
+          "livenessProbe": {
+            "type": "object"
+          },
+          "hpa": {
+            "type": "object",
+            "required": [
+              "maxReplicas"
+            ],
+            "properties": {
+              "minReplicas": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "maxReplicas": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "cpuUtilization": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "memoryUtilization": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "scaleUpStabilizationSeconds": {
+                "type": "integer",
+                "minimum": 0
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

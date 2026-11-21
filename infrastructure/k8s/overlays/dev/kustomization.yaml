@@ -1,0 +1,92 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# dev - local kind cluster. Images are pinned by immutable digest placeholders.
+# Deployments run one replica except the edge and auth paths. HPAs are capped
+# at 2 so a local cluster cannot be asked for 86 pods.
+# Images are pinned by digest (immutable). Replace placeholders with real
+# digests from the dev image build before applying. Never use :latest.
+# Secrets stay outside Git; see external-secret.example.yaml for the secret
+# management reference pattern.
+resources:
+  - ../../base
+
+images:
+  - name: ghcr.io/vijeshvs/smart-match/api-gateway
+    digest: sha256:0000000000000000000000000000000000000000000000000000000000000000
+  - name: ghcr.io/vijeshvs/smart-match/auth-service
+    digest: sha256:0000000000000000000000000000000000000000000000000000000000000000
+  - name: ghcr.io/vijeshvs/smart-match/talent-service
+    digest: sha256:0000000000000000000000000000000000000000000000000000000000000000
+  - name: ghcr.io/vijeshvs/smart-match/recruiter-service
+    digest: sha256:0000000000000000000000000000000000000000000000000000000000000000
+  - name: ghcr.io/vijeshvs/smart-match/engagement-service
+    digest: sha256:0000000000000000000000000000000000000000000000000000000000000000
+  - name: ghcr.io/vijeshvs/smart-match/rewards-service
+    digest: sha256:0000000000000000000000000000000000000000000000000000000000000000
+  - name: ghcr.io/vijeshvs/smart-match/ai-matching-service
+    digest: sha256:0000000000000000000000000000000000000000000000000000000000000000
+  - name: ghcr.io/vijeshvs/smart-match/notification-service
+    digest: sha256:0000000000000000000000000000000000000000000000000000000000000000
+  - name: ghcr.io/vijeshvs/smart-match/analytics-service
+    digest: sha256:0000000000000000000000000000000000000000000000000000000000000000
+
+replicas:
+  - name: api-gateway
+    count: 2
+  - name: auth-service
+    count: 2
+  - name: talent-service
+    count: 1
+  - name: recruiter-service
+    count: 1
+  - name: engagement-service
+    count: 1
+  - name: rewards-service
+    count: 1
+  - name: ai-matching-service
+    count: 1
+  - name: notification-service
+    count: 1
+  - name: analytics-service
+    count: 1
+
+patches:
+  - target:
+      kind: Namespace
+      name: talent-ai
+    patch: |-
+      - op: add
+        path: /metadata/labels/talent.ai~1environment
+        value: dev
+  - target:
+      kind: HorizontalPodAutoscaler
+    patch: |-
+      - op: replace
+        path: /spec/minReplicas
+        value: 1
+      - op: replace
+        path: /spec/maxReplicas
+        value: 2
+  - target:
+      kind: Ingress
+      name: talent-ai
+    patch: |-
+      - op: replace
+        path: /spec/rules/0/host
+        value: api.talent.ai.localhost
+      - op: remove
+        path: /spec/tls
+
+  # dev runs single-replica Deployments; a PDB with minAvailable: 1 would block
+  # every node drain. The objects are removed rather than weakened.
+  - path: delete-pdbs.yaml
+  - path: resources/api-gateway.yaml
+  - path: resources/auth-service.yaml
+  - path: resources/talent-service.yaml
+  - path: resources/recruiter-service.yaml
+  - path: resources/engagement-service.yaml
+  - path: resources/rewards-service.yaml
+  - path: resources/ai-matching-service.yaml
+  - path: resources/notification-service.yaml
+  - path: resources/analytics-service.yaml

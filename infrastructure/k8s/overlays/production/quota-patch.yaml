@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: talent-ai-quota
+  namespace: talent-ai
+spec:
+  hard:
+    requests.cpu: '5'
+    requests.memory: 9Gi
+    limits.cpu: '25'
+    limits.memory: 25Gi
+    pods: '49'

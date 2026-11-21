@@ -1,0 +1,211 @@
+# talent.ai workload chart — Phase 12
+#
+# SCOPE: Deployments, Services and HorizontalPodAutoscalers only.
+#
+# PREREQUISITES (must exist in the target namespace before install):
+#   - ConfigMap/talent-ai-config
+#   - Secret/talent-ai-secrets
+#
+# A standalone `helm install` is NOT a supported deployment path in Phase 12.
+# It renders pods that will fail on missing configuration. Use:
+#
+#   kubectl apply -k infrastructure/k8s/overlays/<dev|staging|production>
+#
+# Environment differences (replicas, HPA caps, image digests, ingress hosts,
+# quota) are owned by the Kustomize overlays, not by chart values.
+
+namespace: talent-ai
+
+image:
+  registry: ghcr.io/vijeshvs/smart-match
+  # Use tag for dev/local. For staging/production, prefer digest for immutable
+  # deployments and set tag to empty or a descriptive value.
+  tag: latest
+  digest: ""
+  pullPolicy: IfNotPresent
+
+configMapName: talent-ai-config
+secretName: talent-ai-secrets
+
+ingress:
+  enabled: false
+  className: nginx
+  annotations:
+    nginx.ingress.kubernetes.io/use-regex: 'true'
+    nginx.ingress.kubernetes.io/proxy-body-size: 10m
+  host: api.talent.ai.localhost
+  tls: []
+  # - secretName: talent-ai-tls
+  #   hosts:
+  #     - api.talent.ai.localhost
+  paths:
+    - path: /ws
+      pathType: Prefix
+      service: notification-service
+      port: 5007
+    - path: /
+      pathType: Prefix
+      service: api-gateway
+      port: 8080
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  fsGroup: 1000
+  seccompProfile:
+    type: RuntimeDefault
+
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop:
+      - ALL
+
+topologySpread:
+  maxSkew: 1
+  topologyKey: kubernetes.io/hostname
+  whenUnsatisfiable: ScheduleAnyway
+
+defaults:
+  replicas: 2
+  resources:
+    requests:
+      cpu: 100m
+      memory: 192Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  readinessProbe:
+    initialDelaySeconds: 10
+    periodSeconds: 15
+    timeoutSeconds: 5
+    failureThreshold: 3
+  livenessProbe:
+    initialDelaySeconds: 20
+    periodSeconds: 20
+    timeoutSeconds: 5
+    failureThreshold: 3
+  hpa:
+    minReplicas: 2
+    cpuUtilization: 70
+    memoryUtilization: 80
+    scaleUpStabilizationSeconds: 30
+  # Scheduling defaults are empty; overlays or per-service values can set them
+  # where node pools/tolerations/affinity are appropriate for the target cluster.
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+
+services:
+  api-gateway:
+    port: 8080
+    component: edge
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 500m
+        memory: 384Mi
+    readinessProbe:
+      initialDelaySeconds: 5
+    livenessProbe:
+      initialDelaySeconds: 15
+    hpa:
+      maxReplicas: 12
+      cpuUtilization: 65
+
+  auth-service:
+    port: 5001
+    component: backend
+    env:
+      # The shared ConfigMap no longer carries PORT. auth-service listens on
+      # 5001, which is its documented default, and is set explicitly here.
+      - name: PORT
+        value: '5001'
+    hpa:
+      maxReplicas: 10
+
+  talent-service:
+    port: 5002
+    component: backend
+    env:
+      - name: PORT
+        value: '5002'
+      - name: MONGODB_DB
+        value: talent_profiles
+      - name: TRUST_GATEWAY_HEADERS
+        value: 'true'
+    hpa:
+      maxReplicas: 10
+
+  recruiter-service:
+    port: 5003
+    component: backend
+    env:
+      - name: PORT
+        value: '5003'
+      - name: TRUST_GATEWAY_HEADERS
+        value: 'true'
+    hpa:
+      maxReplicas: 10
+
+  engagement-service:
+    port: 5004
+    component: backend
+    env:
+      - name: PORT
+        value: '5004'
+      - name: TRUST_GATEWAY_HEADERS
+        value: 'true'
+    hpa:
+      maxReplicas: 10
+
+  rewards-service:
+    port: 5005
+    component: backend
+    env:
+      - name: PORT
+        value: '5005'
+      - name: TRUST_GATEWAY_HEADERS
+        value: 'true'
+    hpa:
+      maxReplicas: 10
+
+  ai-matching-service:
+    port: 5006
+    component: backend
+    env:
+      - name: PORT
+        value: '5006'
+      - name: TRUST_GATEWAY_HEADERS
+        value: 'true'
+    hpa:
+      maxReplicas: 10
+
+  notification-service:
+    port: 5007
+    component: backend
+    # Long-lived WebSocket upgrades stay pinned to the pod that accepted them.
+    sessionAffinity: ClientIP
+    env:
+      - name: PORT
+        value: '5007'
+      - name: NOTIFICATION_MONGODB_DB
+        value: talent_notif
+      - name: TRUST_GATEWAY_HEADERS
+        value: 'true'
+    hpa:
+      maxReplicas: 6
+
+  analytics-service:
+    port: 5008
+    component: backend
+    env:
+      - name: PORT
+        value: '5008'
+      - name: TRUST_GATEWAY_HEADERS
+        value: 'true'
+    hpa:
+      maxReplicas: 8

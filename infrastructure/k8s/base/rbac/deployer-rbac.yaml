@@ -1,0 +1,168 @@
+# Application-surface deployer.
+#
+# Responsibility: create, update and delete the namespaced application objects
+# in `talent-ai` (Deployments, Services, ConfigMaps, HPAs, Ingresses). It is NOT
+# a platform installer and NOT a cluster administrator.
+#
+# Deliberately absent:
+#   serviceaccounts        identity is platform-administered
+#   resourcequotas         platform policy
+#   limitranges            platform policy
+#   networkpolicies        platform policy
+#   poddisruptionbudgets   availability policy
+#   secrets                write access would allow credential injection
+#   roles/rolebindings     escalate/bind is a privilege-escalation path
+#   namespaces/priorityclasses  cluster-scoped, bootstrap only
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: talent-ai-deployer
+  namespace: talent-ai-platform
+  labels:
+    app.kubernetes.io/part-of: talent-ai
+automountServiceAccountToken: false
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: talent-ai-deployer
+  namespace: talent-ai
+  labels:
+    app.kubernetes.io/part-of: talent-ai
+rules:
+  - apiGroups: ['apps']
+    resources: ['deployments']
+    verbs: ['get', 'list', 'watch', 'create', 'update', 'patch', 'delete']
+  - apiGroups: ['']
+    resources: ['services']
+    verbs: ['get', 'list', 'watch', 'create', 'update', 'patch', 'delete']
+  - apiGroups: ['']
+    resources: ['configmaps']
+    verbs: ['get', 'list', 'watch', 'create', 'update', 'patch', 'delete']
+  - apiGroups: ['autoscaling']
+    resources: ['horizontalpodautoscalers']
+    verbs: ['get', 'list', 'watch', 'create', 'update', 'patch', 'delete']
+  - apiGroups: ['networking.k8s.io']
+    resources: ['ingresses']
+    verbs: ['get', 'list', 'watch', 'create', 'update', 'patch', 'delete']
+  - apiGroups: ['']
+    resources: ['pods', 'replicasets', 'events', 'endpoints']
+    verbs: ['get', 'list', 'watch']
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: talent-ai-deployer
+  namespace: talent-ai
+  labels:
+    app.kubernetes.io/part-of: talent-ai
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: talent-ai-deployer
+subjects:
+  - kind: ServiceAccount
+    name: talent-ai-deployer
+    namespace: talent-ai-platform
+---
+# Platform administrators. Bound to a human group, never to a CI
+# ServiceAccount. Namespaced only; no ClusterRole is created in Phase 12.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: talent-ai-platform-admin
+  namespace: talent-ai
+  labels:
+    app.kubernetes.io/part-of: talent-ai
+rules:
+  - apiGroups: ['']
+    resources: ['serviceaccounts', 'resourcequotas', 'limitranges', 'configmaps']
+    verbs: ['get', 'list', 'watch', 'create', 'update', 'patch', 'delete']
+  - apiGroups: ['networking.k8s.io']
+    resources: ['networkpolicies']
+    verbs: ['get', 'list', 'watch', 'create', 'update', 'patch', 'delete']
+  - apiGroups: ['policy']
+    resources: ['poddisruptionbudgets']
+    verbs: ['get', 'list', 'watch', 'create', 'update', 'patch', 'delete']
+  - apiGroups: ['rbac.authorization.k8s.io']
+    resources: ['roles', 'rolebindings']
+    verbs: ['get', 'list', 'watch', 'create', 'update', 'patch', 'delete']
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: talent-ai-platform-admin
+  namespace: talent-ai
+  labels:
+    app.kubernetes.io/part-of: talent-ai
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: talent-ai-platform-admin
+subjects:
+  - kind: Group
+    name: talent-ai-platform-admins
+    apiGroup: rbac.authorization.k8s.io
+---
+# Read-only visibility in the two auxiliary namespaces, without a ClusterRole.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: talent-ai-platform-viewer
+  namespace: talent-ai-platform
+  labels:
+    app.kubernetes.io/part-of: talent-ai
+rules:
+  - apiGroups: ['']
+    resources: ['pods', 'services', 'configmaps', 'serviceaccounts']
+    verbs: ['get', 'list', 'watch']
+  - apiGroups: ['networking.k8s.io']
+    resources: ['networkpolicies']
+    verbs: ['get', 'list', 'watch']
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: talent-ai-platform-viewer
+  namespace: talent-ai-platform
+  labels:
+    app.kubernetes.io/part-of: talent-ai
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: talent-ai-platform-viewer
+subjects:
+  - kind: Group
+    name: talent-ai-platform-admins
+    apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: talent-ai-platform-viewer
+  namespace: talent-ai-data
+  labels:
+    app.kubernetes.io/part-of: talent-ai
+rules:
+  - apiGroups: ['']
+    resources: ['pods', 'services', 'configmaps', 'serviceaccounts']
+    verbs: ['get', 'list', 'watch']
+  - apiGroups: ['networking.k8s.io']
+    resources: ['networkpolicies']
+    verbs: ['get', 'list', 'watch']
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: talent-ai-platform-viewer
+  namespace: talent-ai-data
+  labels:
+    app.kubernetes.io/part-of: talent-ai
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: talent-ai-platform-viewer
+subjects:
+  - kind: Group
+    name: talent-ai-platform-admins
+    apiGroup: rbac.authorization.k8s.io

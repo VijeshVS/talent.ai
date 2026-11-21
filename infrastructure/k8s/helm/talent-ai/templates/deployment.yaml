@@ -1,0 +1,109 @@
+{{- range $name, $svc := .Values.services }}
+{{- $readiness := include "talent-ai.merge" (list $svc.readinessProbe $.Values.defaults.readinessProbe) | fromYaml }}
+{{- $liveness := include "talent-ai.merge" (list $svc.livenessProbe $.Values.defaults.livenessProbe) | fromYaml }}
+{{- $resources := $svc.resources | default $.Values.defaults.resources }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $name }}
+  namespace: {{ $.Values.namespace }}
+  labels:
+    app.kubernetes.io/name: {{ $name }}
+    app.kubernetes.io/component: {{ $svc.component }}
+    app.kubernetes.io/part-of: talent-ai
+spec:
+  replicas: {{ $svc.replicas | default $.Values.defaults.replicas }}
+  revisionHistoryLimit: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ $name }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ $name }}
+        app.kubernetes.io/component: {{ $svc.component }}
+        app.kubernetes.io/part-of: talent-ai
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "{{ $svc.port }}"
+        prometheus.io/path: /metrics
+    spec:
+      serviceAccountName: talent-ai-{{ $name }}
+      automountServiceAccountToken: false
+      securityContext:
+        {{- toYaml $.Values.podSecurityContext | nindent 8 }}
+      topologySpreadConstraints:
+        - maxSkew: {{ $.Values.topologySpread.maxSkew }}
+          topologyKey: {{ $.Values.topologySpread.topologyKey }}
+          whenUnsatisfiable: {{ $.Values.topologySpread.whenUnsatisfiable }}
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: {{ $name }}
+      {{- $nodeSelector := $svc.nodeSelector | default $.Values.defaults.nodeSelector }}
+      {{- with $nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- $tolerations := $svc.tolerations | default $.Values.defaults.tolerations }}
+      {{- with $tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- $affinity := $svc.affinity | default $.Values.defaults.affinity }}
+      {{- with $affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: {{ $name }}
+          {{- $imageRef := printf "%s/%s:%s" $.Values.image.registry $name $.Values.image.tag }}
+          {{- if $.Values.image.digest }}
+          {{- $imageRef = printf "%s/%s@%s" $.Values.image.registry $name $.Values.image.digest }}
+          {{- end }}
+          image: "{{ $imageRef }}"
+          imagePullPolicy: {{ $.Values.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ $svc.port }}
+          envFrom:
+            - configMapRef:
+                name: {{ $.Values.configMapName }}
+            - secretRef:
+                name: {{ $.Values.secretName }}
+          {{- with $svc.env }}
+          env:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          readinessProbe:
+            httpGet:
+              path: /health/readiness
+              port: http
+            initialDelaySeconds: {{ $readiness.initialDelaySeconds }}
+            periodSeconds: {{ $readiness.periodSeconds }}
+            timeoutSeconds: {{ $readiness.timeoutSeconds }}
+            failureThreshold: {{ $readiness.failureThreshold }}
+          livenessProbe:
+            httpGet:
+              path: /health/liveness
+              port: http
+            initialDelaySeconds: {{ $liveness.initialDelaySeconds }}
+            periodSeconds: {{ $liveness.periodSeconds }}
+            timeoutSeconds: {{ $liveness.timeoutSeconds }}
+            failureThreshold: {{ $liveness.failureThreshold }}
+          resources:
+            {{- toYaml $resources | nindent 12 }}
+          securityContext:
+            {{- toYaml $.Values.containerSecurityContext | nindent 12 }}
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
+{{- end }}

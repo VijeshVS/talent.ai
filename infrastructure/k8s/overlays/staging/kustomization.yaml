@@ -1,0 +1,82 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# staging — managed cluster.
+#
+# NON-DEPLOYABLE AS COMMITTED: every image is a digest placeholder. The release
+# workflow that writes real digests is not part of Phase 12. Do not apply this
+# overlay until the placeholders are replaced with content-addressed digests.
+# Secrets stay outside Git; see external-secret.example.yaml.
+resources:
+  - ../../base
+
+images:
+  - name: ghcr.io/vijeshvs/smart-match/api-gateway
+    digest: sha256:0000000000000000000000000000000000000000000000000000000000000000
+  - name: ghcr.io/vijeshvs/smart-match/auth-service
+    digest: sha256:0000000000000000000000000000000000000000000000000000000000000000
+  - name: ghcr.io/vijeshvs/smart-match/talent-service
+    digest: sha256:0000000000000000000000000000000000000000000000000000000000000000
+  - name: ghcr.io/vijeshvs/smart-match/recruiter-service
+    digest: sha256:0000000000000000000000000000000000000000000000000000000000000000
+  - name: ghcr.io/vijeshvs/smart-match/engagement-service
+    digest: sha256:0000000000000000000000000000000000000000000000000000000000000000
+  - name: ghcr.io/vijeshvs/smart-match/rewards-service
+    digest: sha256:0000000000000000000000000000000000000000000000000000000000000000
+  - name: ghcr.io/vijeshvs/smart-match/ai-matching-service
+    digest: sha256:0000000000000000000000000000000000000000000000000000000000000000
+  - name: ghcr.io/vijeshvs/smart-match/notification-service
+    digest: sha256:0000000000000000000000000000000000000000000000000000000000000000
+  - name: ghcr.io/vijeshvs/smart-match/analytics-service
+    digest: sha256:0000000000000000000000000000000000000000000000000000000000000000
+
+patches:
+  - target:
+      kind: Namespace
+      name: talent-ai
+    patch: |-
+      - op: add
+        path: /metadata/labels/talent.ai~1environment
+        value: staging
+  - target:
+      kind: Ingress
+      name: talent-ai
+    patch: |-
+      - op: replace
+        path: /spec/rules/0/host
+        value: api.staging.talent.ai
+      - op: replace
+        path: /spec/tls/0/hosts/0
+        value: api.staging.talent.ai
+  - target:
+      kind: Deployment
+    patch: |-
+      - op: add
+        path: /spec/template/spec/priorityClassName
+        value: talent-ai-standard
+  - target:
+      kind: Deployment
+      name: api-gateway
+    patch: |-
+      - op: replace
+        path: /spec/template/spec/priorityClassName
+        value: talent-ai-critical
+  - target:
+      kind: Deployment
+      name: auth-service
+    patch: |-
+      - op: replace
+        path: /spec/template/spec/priorityClassName
+        value: talent-ai-critical
+
+  - path: hpa-patch.yaml
+  - path: quota-patch.yaml
+  - path: resources/api-gateway.yaml
+  - path: resources/auth-service.yaml
+  - path: resources/talent-service.yaml
+  - path: resources/recruiter-service.yaml
+  - path: resources/engagement-service.yaml
+  - path: resources/rewards-service.yaml
+  - path: resources/ai-matching-service.yaml
+  - path: resources/notification-service.yaml
+  - path: resources/analytics-service.yaml

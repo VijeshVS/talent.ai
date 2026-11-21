@@ -1,0 +1,80 @@
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: api-gateway
+  namespace: talent-ai
+spec:
+  minReplicas: 2
+  maxReplicas: 6
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: auth-service
+  namespace: talent-ai
+spec:
+  minReplicas: 2
+  maxReplicas: 6
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: talent-service
+  namespace: talent-ai
+spec:
+  minReplicas: 2
+  maxReplicas: 4
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: recruiter-service
+  namespace: talent-ai
+spec:
+  minReplicas: 2
+  maxReplicas: 4
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: engagement-service
+  namespace: talent-ai
+spec:
+  minReplicas: 2
+  maxReplicas: 4
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: rewards-service
+  namespace: talent-ai
+spec:
+  minReplicas: 2
+  maxReplicas: 4
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: ai-matching-service
+  namespace: talent-ai
+spec:
+  minReplicas: 2
+  maxReplicas: 4
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: notification-service
+  namespace: talent-ai
+spec:
+  minReplicas: 2
+  maxReplicas: 3
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: analytics-service
+  namespace: talent-ai
+spec:
+  minReplicas: 2
+  maxReplicas: 3

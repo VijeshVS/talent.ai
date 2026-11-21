@@ -1,0 +1,183 @@
+name: Kubernetes Validation
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'infrastructure/k8s/**'
+      - 'infrastructure/kustomization.yaml'
+      - 'scripts/k8s/**'
+      - '.github/workflows/kubernetes-validation.yml'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'infrastructure/k8s/**'
+      - 'infrastructure/kustomization.yaml'
+      - 'scripts/k8s/**'
+      - '.github/workflows/kubernetes-validation.yml'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+  workflow_dispatch:
+
+concurrency:
+  group: kubernetes-validation-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  NODE_VERSION: '22'
+  PNPM_VERSION: '10.29.2'
+  KUBERNETES_BASELINE: '1.35.8'
+  KUBECONFORM_VERSION: 'v0.7.0'
+  KUBECONFORM_VERSIONS: '1.35.0,1.36.0,1.37.0'
+  HELM_VERSION: 'v3.19.0'
+  KUBECTL_VERSION: 'v1.35.8'
+  CONFTEST_VERSION: 'v0.68.2'
+  KIND_VERSION: 'v0.33.0'
+  KIND_NODE_IMAGE: 'kindest/node:v1.35.8@sha256:07b2536e30b803ed61d1677a79df6115f798ce64c80f9e22f6ed45afd09323c0'
+  KUBECONFORM_SHA256: 'c31518ddd122663b3f3aa874cfe8178cb0988de944f29c74a0b9260920d115d3'
+  CONFTEST_SHA256: 'e8144c6d6d2ae0260b869caa60c7c262a1f95ac63ec1e5d2fb19be452d606347'
+
+jobs:
+  validate:
+    name: Kustomize, Kubeconform, Helm and manifest checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4.2.2
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4.1.0
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Setup Node
+        uses: actions/setup-node@v4.4.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Setup Helm
+        uses: azure/setup-helm@v4.3.0
+        with:
+          version: ${{ env.HELM_VERSION }}
+
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v4.0.1
+        with:
+          version: ${{ env.KUBECTL_VERSION }}
+
+      - name: Install kubeconform (checksum verified)
+        run: |
+          set -euo pipefail
+          curl -fsSL -o kubeconform.tar.gz \
+            "https://github.com/yannh/kubeconform/releases/download/${KUBECONFORM_VERSION}/kubeconform-linux-amd64.tar.gz"
+          echo "${KUBECONFORM_SHA256}  kubeconform.tar.gz" | sha256sum -c -
+          tar -xzf kubeconform.tar.gz kubeconform
+          sudo install -m 0755 kubeconform /usr/local/bin/kubeconform
+
+      - name: Install conftest (checksum verified)
+        run: |
+          set -euo pipefail
+          curl -fsSL -o conftest.tar.gz \
+            "https://github.com/open-policy-agent/conftest/releases/download/${CONFTEST_VERSION}/conftest_${CONFTEST_VERSION#v}_Linux_x86_64.tar.gz"
+          echo "${CONFTEST_SHA256}  conftest.tar.gz" | sha256sum -c -
+          tar -xzf conftest.tar.gz conftest
+          sudo install -m 0755 conftest /usr/local/bin/conftest
+
+      - name: Verify toolchain pins
+        run: |
+          set -euo pipefail
+          grep -q "^KUBERNETES_BASELINE=${KUBERNETES_BASELINE}$" infrastructure/k8s/versions.env
+          grep -q "^KUBECONFORM_VERSIONS=${KUBECONFORM_VERSIONS}$" infrastructure/k8s/versions.env
+          grep -q "^HELM_VERSION=${HELM_VERSION}$" infrastructure/k8s/versions.env
+          grep -q "^KUBECTL_VERSION=${KUBECTL_VERSION}$" infrastructure/k8s/versions.env
+          grep -q "^KUBECONFORM_VERSION=${KUBECONFORM_VERSION}$" infrastructure/k8s/versions.env
+          grep -q "^CONFTEST_VERSION=${CONFTEST_VERSION}$" infrastructure/k8s/versions.env
+          grep -q "^KIND_VERSION=${KIND_VERSION}$" infrastructure/k8s/versions.env
+          grep -q "^KIND_NODE_IMAGE=${KIND_NODE_IMAGE}$" infrastructure/k8s/versions.env
+          grep -q "^KUBECONFORM_LINUX_AMD64_SHA256=${KUBECONFORM_SHA256}$" infrastructure/k8s/versions.env
+          grep -q "^CONFTEST_LINUX_AMD64_SHA256=${CONFTEST_SHA256}$" infrastructure/k8s/versions.env
+
+      - name: Kustomize render (dev/staging/production)
+        run: |
+          set -euo pipefail
+          kubectl kustomize infrastructure/k8s/overlays/dev > /tmp/dev.yaml
+          kubectl kustomize infrastructure/k8s/overlays/staging > /tmp/staging.yaml
+          kubectl kustomize infrastructure/k8s/overlays/production > /tmp/production.yaml
+
+      - name: Helm lint and template
+        run: |
+          set -euo pipefail
+          helm lint infrastructure/k8s/helm/talent-ai
+          helm template talent-ai infrastructure/k8s/helm/talent-ai --kube-version "${KUBERNETES_BASELINE}" > /tmp/helm-default.yaml
+          helm template talent-ai infrastructure/k8s/helm/talent-ai -f infrastructure/k8s/helm/talent-ai/values-dev.yaml --kube-version "${KUBERNETES_BASELINE}" > /tmp/helm-dev.yaml
+          helm template talent-ai infrastructure/k8s/helm/talent-ai -f infrastructure/k8s/helm/talent-ai/values-staging.yaml --kube-version "${KUBERNETES_BASELINE}" > /tmp/helm-staging.yaml
+          helm template talent-ai infrastructure/k8s/helm/talent-ai -f infrastructure/k8s/helm/talent-ai/values-production.yaml --kube-version "${KUBERNETES_BASELINE}" > /tmp/helm-production.yaml
+
+      - name: Kubeconform (strict, all environments)
+        run: |
+          set -euo pipefail
+          IFS=',' read -ra VERSIONS <<< "${KUBECONFORM_VERSIONS}"
+          for v in "${VERSIONS[@]}"; do
+            kubeconform -strict -summary -kubernetes-version "$v" /tmp/dev.yaml /tmp/staging.yaml /tmp/production.yaml
+          done
+
+      - name: Rendered manifest tests
+        run: node scripts/k8s/check-rendered.mjs
+
+      - name: Conftest policy and quota checks
+        run: pnpm k8s:validate
+
+  server-dry-run:
+    name: Server-side dry-run (kind, dev overlay)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: validate
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4.2.2
+
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v4.0.1
+        with:
+          version: ${{ env.KUBECTL_VERSION }}
+
+      - name: Create kind cluster
+        uses: helm/kind-action@v1.12.0
+        with:
+          version: ${{ env.KIND_VERSION }}
+          node_image: ${{ env.KIND_NODE_IMAGE }}
+          cluster_name: talent-ai-dev
+          config: infrastructure/k8s/kind/kind-config.yaml
+
+      - name: Render dev overlay and split prerequisites
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/dev
+          kubectl kustomize infrastructure/k8s/overlays/dev > /tmp/dev/all.yaml
+          node scripts/k8s/split-render.mjs /tmp/dev/all.yaml /tmp/dev/split
+
+      - name: Apply cluster/namespace prerequisites
+        run: |
+          set -euo pipefail
+          kubectl apply -f /tmp/dev/split/namespaces.yaml
+          kubectl apply -f /tmp/dev/split/priorityclasses.yaml
+          kubectl -n talent-ai create configmap talent-ai-config --from-literal=OTEL_ENABLED=false --dry-run=client -o yaml | kubectl apply -f -
+          kubectl -n talent-ai create secret generic talent-ai-secrets \
+            --from-literal=JWT_ACCESS_SECRET="$(openssl rand -hex 32)" \
+            --from-literal=JWT_REFRESH_SECRET="$(openssl rand -hex 32)" \
+            --dry-run=client -o yaml | kubectl apply -f -
+
+      - name: Server-side dry-run (dev overlay)
+        run: kubectl apply --dry-run=server -k infrastructure/k8s/overlays/dev

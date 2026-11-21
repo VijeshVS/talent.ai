@@ -1,114 +1,150 @@
-# Kubernetes manifests
+﻿# Kubernetes platform
 
-Phase 9.5 deployment assets for talent.ai.
+Phase 12 platform foundation for talent.ai. The full design, rationale and
+verification record are in
+[`docs/phase-12-kubernetes-platform.md`](../../docs/phase-12-kubernetes-platform.md).
 
-| File | Contents |
-| :--- | :--- |
-| `namespace.yaml` | `talent-ai` namespace. |
-| `configmap.yaml` | Shared non-secret configuration (telemetry, URLs, rate limits, cookie policy). |
-| `secret.example.yaml` | Template for `talent-ai-secrets`. Never commit real values. |
-| `auth-service.yaml` | `auth-service` Deployment + ClusterIP Service. |
-| `talent-service.yaml` | `talent-service` Deployment + ClusterIP Service (port 5002, MongoDB). |
-| `recruiter-service.yaml` | `recruiter-service` Deployment + ClusterIP Service (port 5003, PostgreSQL). |
-| `engagement-service.yaml` | `engagement-service` Deployment + ClusterIP Service (port 5004, PostgreSQL). |
-| `rewards-service.yaml` | `rewards-service` Deployment + ClusterIP Service (port 5005, PostgreSQL). |
-| `ai-matching-service.yaml` | `ai-matching-service` Deployment + ClusterIP Service (port 5006, Qdrant + Redis). |
-| `notification-service.yaml` | `notification-service` Deployment + sticky ClusterIP Service (port 5007, MongoDB + Redis fan-out, WebSocket). |
-| `analytics-service.yaml` | `analytics-service` Deployment + ClusterIP Service (port 5008, PostgreSQL read models). |
-| `api-gateway.yaml` | `api-gateway` Deployment + ClusterIP Service. |
-| `hpa.yaml` | CPU/memory HPAs for every service. |
-| `ingress.yaml` | Nginx ingress for `api.talent.ai`, `talent.ai`, `recruiter.talent.ai`. |
-| `observability/prometheus.yaml` | Prometheus ConfigMap (scrape config), Deployment and Service. |
-| `observability/grafana.yaml` | Grafana datasources/provider ConfigMaps, Deployment (with the generated dashboards ConfigMap) and Service. |
-| `secret.grafana.example.yaml` | Template for the optional `talent-ai-grafana-admin` secret. |
-| `kustomization.yaml` | Renders the application manifests above. |
-| `../kustomization.yaml` | Renders the application **plus** observability and generates the dashboard/rule ConfigMaps from the Compose files. |
+## Layers
 
-## Render and apply
+| Layer | Authored source | Rendered by |
+| :--- | :--- | :--- |
+| Workloads â€” 9 Deployments, 9 Services, 9 HPAs | `helm/talent-ai` | `base/workloads/workloads.generated.yaml` |
+| Platform â€” namespaces, RBAC, config, networking, policy | `base/**` | `base/kustomization.yaml` |
+| Environment differences | `overlays/<env>` | that overlay |
+| Observability â€” Prometheus, Grafana | `observability/*.yaml` (Phase 11, unchanged) | `observability/kustomization.yaml` |
 
-Use the parent kustomization to deploy the application and observability
-together:
+`base/workloads/workloads.generated.yaml` is **generated**. Do not edit it by
+hand; change the chart and run `pnpm k8s:sync-workloads`. CI fails if the
+committed file is stale.
+
+## Apply
 
 ```bash
-kubectl kustomize infrastructure            # preview
-kubectl apply -k infrastructure
+# local / dev â€” the only deployable render
+kubectl apply -k infrastructure/k8s/overlays/dev
 
-# application manifests only
-kubectl kustomize infrastructure/k8s
-kubectl apply -k infrastructure/k8s
+# staging / production â€” replace the sha256:0000â€¦ digest placeholders first
+kubectl apply -k infrastructure/k8s/overlays/staging
+kubectl apply -k infrastructure/k8s/overlays/production
 ```
 
-`infrastructure/kustomization.yaml` generates
-`talent-ai-grafana-dashboards` and `talent-ai-prometheus-rules` directly from
-`infrastructure/docker/grafana/dashboards/` and
-`infrastructure/docker/prometheus/rules/`. Do not copy dashboards into
-`infrastructure/k8s/`.
-
-Create the Grafana admin secret before exposing Grafana:
+Legacy entrypoints still resolve:
 
 ```bash
-kubectl apply -f infrastructure/k8s/secret.grafana.example.yaml   # edit first
+kubectl apply -k infrastructure/k8s   # production platform overlay
+kubectl apply -k infrastructure       # production platform + observability
 ```
 
-Secrets are created out of band:
-kubectl -n talent-ai create secret generic talent-ai-secrets \
-  --from-literal=DATABASE_URL='postgresql://talent:...@postgres:5432/talent_auth' \
-  --from-literal=RECRUITER_DATABASE_URL='postgresql://talent:...@postgres:5432/talent_recruiter?schema=public' \
-  --from-literal=ENGAGEMENT_DATABASE_URL='postgresql://talent:...@postgres:5432/talent_engagement?schema=public' \
-  --from-literal=REWARDS_DATABASE_URL='postgresql://talent:...@postgres:5432/talent_rewards?schema=public' \
-  --from-literal=ANALYTICS_DATABASE_URL='postgresql://talent:...@postgres:5432/talent_analytics?schema=public' \
-  --from-literal=ANALYTICS_DB_USER='talent' \
-  --from-literal=ANALYTICS_DB_PASSWORD='...' \
-  --from-literal=MONGODB_URI='mongodb://talent:...@mongodb:27017/talent_profiles?replicaSet=rs0' \
-  --from-literal=NOTIFICATION_MONGODB_URI='mongodb://talent:...@mongodb:27017/talent_notif?replicaSet=rs0' \
-  --from-literal=REDIS_URL='redis://redis:6379' \
-  --from-literal=RABBITMQ_URL='amqp://talent:...@rabbitmq:5672' \
-  --from-literal=JWT_ACCESS_SECRET='...' \
-  --from-literal=JWT_REFRESH_SECRET='...' \
-  --from-literal=GROQ_API_KEY='...' \
-  --from-literal=GEMINI_API_KEY='...' \
-  --from-literal=OPENAI_API_KEY='...' \
-  --from-literal=QDRANT_API_KEY='...'
-```
+Both render the production overlay and therefore inherit its digest
+placeholders. They are not deployable until the release workflow writes real
+digests.
 
-The AI provider and Qdrant credentials are optional. With `AI_PROVIDER=auto` and
-no provider keys, `ai-matching-service` uses its deterministic local engine;
-`QDRANT_API_KEY` is only required when Qdrant has authentication enabled.
-`SMTP_URL` is optional: without it, notification email is rendered to the log
-rather than sent. Notification pods share live sockets through Redis pub/sub, so
-scaling past one replica does not strand a connected client.
+## Prerequisites
 
-Analytics migrations are applied out of band, once per release:
+The chart and overlays depend on these existing in `talent-ai`:
+
+- `ConfigMap/talent-ai-config` (rendered by `base/config`)
+- `Secret/talent-ai-secrets` (create from the template, never committed)
 
 ```bash
-pnpm --filter @talent-ai/analytics-service db:deploy
+cp base/config/secret.example.yaml /tmp/talent-ai-secrets.yaml
+# edit every CHANGE_ME value, then:
+kubectl apply -f /tmp/talent-ai-secrets.yaml
 ```
 
-Prerequisites:
+`base/config/secret.grafana.example.yaml` is the optional Grafana admin secret.
 
-- An Nginx ingress controller and a `talent-ai-tls` certificate secret.
-- PostgreSQL, Redis, RabbitMQ, MongoDB and Qdrant reachable at the hosts
-  referenced in the secret / ConfigMap (in-cluster or managed services).
-- An OTLP endpoint at `jaeger-collector.observability.svc.cluster.local:4318`
-  or an override of `OTEL_EXPORTER_OTLP_ENDPOINT` in the ConfigMap.
-- Metrics scraping: the bundled Prometheus deployment scrapes the service
-  ClusterIPs and the RabbitMQ/Qdrant/exporter endpoints in
-  `observability/prometheus.yaml`. Replace those targets when the dependencies
-  are managed outside the cluster.
-- Grafana reads the analytics datasource from `ANALYTICS_DB_*` env vars backed
-  by `talent-ai-secrets`; see `observability/grafana.yaml`.
+## Required tools
 
-## Adding a service
+Pinned versions are in [`versions.env`](./versions.env). CI verifies the workflow env against that file.
 
-Each new microservice (AI matching, notification, analytics) follows
-the same pattern as `auth-service.yaml` / `recruiter-service.yaml`:
+| Tool | Purpose |
+|---|---|
+| `kubectl` | Kustomize render, server-side dry-run |
+| `kustomize` (optional standalone) | Same render path; `kubectl kustomize` also works |
+| `helm` | Chart lint/template |
+| `kubeconform` | Strict schema validation against Kubernetes versions |
+| `conftest` | Rego policy tests |
+| `kind` | Local server-side dry-run cluster |
+| `node` + `pnpm` | Validation scripts (`scripts/k8s/*`) |
 
-1. Copy the Deployment/Service pair and replace every `auth-service` /
-   `5001` occurrence with the new service name and `SERVICE_PORTS` value.
-2. Add the file to `resources` in `kustomization.yaml` and add its image to the
-   `images` list.
-3. Add an HPA entry to `hpa.yaml`.
-4. Add the image to the CI matrix in `.github/workflows/docker.yml`.
+## Local validation commands
 
-Portal Services (`candidate-portal`, `recruiter-portal`) are created in Phase 8
-and are already referenced by the ingress rules.
+```bash
+# Full local pipeline (drift, helm, renders, kubeconform, conftest, quota)
+pnpm k8s:validate
+
+# Individual checks
+pnpm k8s:sync-workloads --check
+pnpm k8s:render
+kubectl kustomize infrastructure/k8s/overlays/dev
+kubectl kustomize infrastructure/k8s/overlays/staging
+kubectl kustomize infrastructure/k8s/overlays/production
+helm lint infrastructure/k8s/helm/talent-ai
+helm template talent-ai infrastructure/k8s/helm/talent-ai --kube-version 1.35.8
+helm template talent-ai infrastructure/k8s/helm/talent-ai -f infrastructure/k8s/helm/talent-ai/values-dev.yaml --kube-version 1.35.8
+helm template talent-ai infrastructure/k8s/helm/talent-ai -f infrastructure/k8s/helm/talent-ai/values-staging.yaml --kube-version 1.35.8
+helm template talent-ai infrastructure/k8s/helm/talent-ai -f infrastructure/k8s/helm/talent-ai/values-production.yaml --kube-version 1.35.8
+node scripts/k8s/check-rendered.mjs
+pnpm k8s:quota dev
+
+# Server-side dry-run (kind)
+kind create cluster --name talent-ai-dev --config infrastructure/k8s/kind/kind-config.yaml
+kubectl apply --dry-run=server -k infrastructure/k8s/overlays/dev
+```
+
+If the dev dry-run fails with `namespaces ... not found` on a fresh cluster, apply namespace/prerequisite resources first, then rerun the dry-run (see CI workflow for the split-render pattern).
+
+## CI workflow
+
+`.github/workflows/kubernetes-validation.yml` runs on push/PR to `main` and on changes to `infrastructure/k8s/**`, `infrastructure/kustomization.yaml`, `scripts/k8s/**`, the workflow itself, or package manifests.
+
+Jobs:
+- **validate**: install pinned tools (checksums verified), render all overlays, run Helm lint/template (default + dev/staging/production values), run strict Kubeconform against configured Kubernetes schema versions, run rendered-manifest checks, then run `pnpm k8s:validate` (conftest/quota/drift/render checks).
+- **server-dry-run**: create a pinned kind cluster, render/split dev overlay, apply namespace/PriorityClass prerequisites and dummy ConfigMap/Secret for admission, then run `kubectl apply --dry-run=server -k infrastructure/k8s/overlays/dev`.
+
+CI does not deploy to production and uses no production credentials. GitHub Actions permissions are `contents: read`.
+
+## Troubleshooting
+
+| Symptom | Likely cause | Fix |
+|---|---|---|
+| `workloads.generated.yaml is out of date` | Chart changed but generated file not synced | `pnpm k8s:sync-workloads`, commit result |
+| Kubeconform schema errors | Invalid field/kind or wrong apiVersion | Fix manifest/chart; confirm target Kubernetes version in `versions.env` |
+| Kubeconform download/network errors | Transient schema fetch failure | Rerun; validation script retries transient fetch errors |
+| `:latest` / digest placeholder failures | Immutable image policy | Replace with real digest `@sha256:...` |
+| `Secret ... not found` in dry-run/runtime | Secret not created | Create `talent-ai-secrets` from example via secret manager; do not commit plaintext |
+| Dry-run `namespaces ... not found` | Fresh cluster, namespaced objects applied before Namespace | Apply namespaces/PriorityClasses first, or use split-render pattern |
+| Helm kubeVersion error | Local Helm default version too old/new | Pass `--kube-version 1.35.8` (or pinned baseline) |
+| Conftest failure | Security/RBAC/resource policy violation | Read rego message, fix manifest/chart, rerun `pnpm k8s:validate` |
+
+## Layout
+
+```text
+k8s/
+â”œâ”€â”€ versions.env            # pinned tool versions and checksums
+â”œâ”€â”€ base/
+â”‚   â”œâ”€â”€ namespaces/         # talent-ai, talent-ai-platform, talent-ai-data
+â”‚   â”œâ”€â”€ rbac/               # 9 workload SAs, deployer + admin Roles
+â”‚   â”œâ”€â”€ config/             # ConfigMap + Secret templates
+â”‚   â”œâ”€â”€ workloads/          # generated from the chart
+â”‚   â”œâ”€â”€ networking/         # Ingress, 18 NetworkPolicies, quarantined portal rules
+â”‚   â””â”€â”€ policies/           # ResourceQuota, LimitRange, 9 PDBs, 2 PriorityClasses
+â”œâ”€â”€ overlays/{dev,staging,production}/
+â”œâ”€â”€ helm/talent-ai/         # workload chart (source of truth)
+â”œâ”€â”€ kind/kind-config.yaml   # pinned node image
+â”œâ”€â”€ policies/rego/          # conftest policy
+â””â”€â”€ observability/          # Phase 11 Prometheus + Grafana
+```
+
+## Things to know
+
+- `talent-ai` enforces PSA `baseline` because Prometheus and Grafana run as
+  root; the nine app pods satisfy `restricted` and are held to it by policy.
+- No metrics-server, so HPAs are inert on a fresh cluster.
+- kindnet does not enforce NetworkPolicy; policies are declarative locally.
+- No in-cluster datastores; `talent-ai-data` is declared and empty.
+- No PVCs; `/tmp` uses `emptyDir`, and Prometheus/Grafana data is ephemeral.
+- Portal ingress rules live in `base/networking/ingress-portals.pending.yaml`
+  and are intentionally not referenced.
+
