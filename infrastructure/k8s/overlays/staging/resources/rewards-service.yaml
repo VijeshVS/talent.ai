@@ -1,0 +1,18 @@
+# Environment-specific resource requests/limits for staging.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rewards-service
+  namespace: talent-ai
+spec:
+  template:
+    spec:
+      containers:
+        - name: rewards-service
+          resources:
+            requests:
+              cpu: 100m
+              memory: 192Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi

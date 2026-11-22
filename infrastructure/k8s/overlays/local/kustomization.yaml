@@ -1,0 +1,173 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Local single-node profile for a laptop (kind + Docker Desktop).
+#
+# This overlay is additive and local-only. It is intentionally NOT part of
+# `pnpm k8s:validate`, which covers dev/staging/production. It inherits the dev
+# overlay (PDB removal, dev resource patches, dev quota, environment=dev) and
+# adds:
+#
+#   - one replica per service; HPAs only for api-gateway/auth-service, pinned to 1/1
+#   - no rollout surge (allow one pod to be unavailable during local updates)
+#   - images built locally (`docker compose build`) and loaded into kind
+#   - in-cluster datastores in talent-ai-data (no external dependencies)
+#   - localhost CORS/cookie settings for the host-run portals
+#
+# Run it with `pnpm k8s:local:up` (see scripts/k8s/local-cluster.sh).
+
+resources:
+  - ../dev
+  - datastores
+
+images:
+  - name: ghcr.io/vijeshvs/smart-match/api-gateway
+    newName: talent-ai/api-gateway
+    newTag: local
+  - name: ghcr.io/vijeshvs/smart-match/auth-service
+    newName: talent-ai/auth-service
+    newTag: local
+  - name: ghcr.io/vijeshvs/smart-match/talent-service
+    newName: talent-ai/talent-service
+    newTag: local
+  - name: ghcr.io/vijeshvs/smart-match/recruiter-service
+    newName: talent-ai/recruiter-service
+    newTag: local
+  - name: ghcr.io/vijeshvs/smart-match/engagement-service
+    newName: talent-ai/engagement-service
+    newTag: local
+  - name: ghcr.io/vijeshvs/smart-match/rewards-service
+    newName: talent-ai/rewards-service
+    newTag: local
+  - name: ghcr.io/vijeshvs/smart-match/ai-matching-service
+    newName: talent-ai/ai-matching-service
+    newTag: local
+  - name: ghcr.io/vijeshvs/smart-match/notification-service
+    newName: talent-ai/notification-service
+    newTag: local
+  - name: ghcr.io/vijeshvs/smart-match/analytics-service
+    newName: talent-ai/analytics-service
+    newTag: local
+
+replicas:
+  - name: api-gateway
+    count: 1
+  - name: auth-service
+    count: 1
+  - name: talent-service
+    count: 1
+  - name: recruiter-service
+    count: 1
+  - name: engagement-service
+    count: 1
+  - name: rewards-service
+    count: 1
+  - name: ai-matching-service
+    count: 1
+  - name: notification-service
+    count: 1
+  - name: analytics-service
+    count: 1
+
+patches:
+  # Only the edge and auth paths need autoscaling. Keep those HPAs at 1/1
+  # because this local cluster has no metrics-server; remove the other seven.
+  - target:
+      kind: HorizontalPodAutoscaler
+      name: talent-service
+    patch: |-
+      $patch: delete
+      apiVersion: autoscaling/v2
+      kind: HorizontalPodAutoscaler
+      metadata:
+        name: talent-service
+
+  - target:
+      kind: HorizontalPodAutoscaler
+      name: recruiter-service
+    patch: |-
+      $patch: delete
+      apiVersion: autoscaling/v2
+      kind: HorizontalPodAutoscaler
+      metadata:
+        name: recruiter-service
+
+  - target:
+      kind: HorizontalPodAutoscaler
+      name: engagement-service
+    patch: |-
+      $patch: delete
+      apiVersion: autoscaling/v2
+      kind: HorizontalPodAutoscaler
+      metadata:
+        name: engagement-service
+
+  - target:
+      kind: HorizontalPodAutoscaler
+      name: rewards-service
+    patch: |-
+      $patch: delete
+      apiVersion: autoscaling/v2
+      kind: HorizontalPodAutoscaler
+      metadata:
+        name: rewards-service
+
+  - target:
+      kind: HorizontalPodAutoscaler
+      name: ai-matching-service
+    patch: |-
+      $patch: delete
+      apiVersion: autoscaling/v2
+      kind: HorizontalPodAutoscaler
+      metadata:
+        name: ai-matching-service
+
+  - target:
+      kind: HorizontalPodAutoscaler
+      name: notification-service
+    patch: |-
+      $patch: delete
+      apiVersion: autoscaling/v2
+      kind: HorizontalPodAutoscaler
+      metadata:
+        name: notification-service
+
+  - target:
+      kind: HorizontalPodAutoscaler
+      name: analytics-service
+    patch: |-
+      $patch: delete
+      apiVersion: autoscaling/v2
+      kind: HorizontalPodAutoscaler
+      metadata:
+        name: analytics-service
+
+  # A local update can briefly take a service offline instead of scheduling an
+  # extra pod that the laptop may not have memory to run.
+  - target:
+      kind: Deployment
+      name: (api-gateway|auth-service|talent-service|recruiter-service|engagement-service|rewards-service|ai-matching-service|notification-service|analytics-service)
+    patch: |-
+      - op: replace
+        path: /spec/strategy/rollingUpdate/maxSurge
+        value: 0
+      - op: replace
+        path: /spec/strategy/rollingUpdate/maxUnavailable
+        value: 1
+
+  # The two remaining local HPAs are retained for parity and pinned to 1/1.
+  - target:
+      kind: HorizontalPodAutoscaler
+      name: (api-gateway|auth-service)
+    patch: |-
+      - op: replace
+        path: /spec/minReplicas
+        value: 1
+      - op: replace
+        path: /spec/maxReplicas
+        value: 1
+
+  - target:
+      kind: ConfigMap
+      name: talent-ai-config
+    path: configmap-patch.yaml

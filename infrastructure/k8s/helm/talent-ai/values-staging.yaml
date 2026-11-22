@@ -1,0 +1,52 @@
+# Staging values. Replace digest placeholders with real release digests.
+image:
+  tag: ""
+  digest: sha256:0000000000000000000000000000000000000000000000000000000000000000
+  pullPolicy: IfNotPresent
+
+ingress:
+  enabled: true
+  host: api.staging.talent.ai
+  tls:
+    - secretName: talent-ai-tls
+      hosts:
+        - api.staging.talent.ai
+
+defaults:
+  replicas: 2
+  resources:
+    requests:
+      cpu: 100m
+      memory: 192Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  hpa:
+    minReplicas: 2
+    maxReplicas: 4
+
+services:
+  api-gateway:
+    replicas: 2
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 500m
+        memory: 384Mi
+    hpa:
+      minReplicas: 2
+      maxReplicas: 4
+  auth-service:
+    hpa:
+      minReplicas: 2
+      maxReplicas: 4
+  notification-service:
+    hpa:
+      minReplicas: 2
+      maxReplicas: 3
+  analytics-service:
+    hpa:
+      minReplicas: 2
+      maxReplicas: 3

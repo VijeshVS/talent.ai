@@ -1,0 +1,43 @@
+# Dev values for local/dev clusters.
+# Images must be immutable; replace digest placeholders with real dev digests.
+image:
+  tag: ""
+  digest: sha256:0000000000000000000000000000000000000000000000000000000000000000
+  pullPolicy: IfNotPresent
+
+ingress:
+  enabled: true
+  host: api.talent.ai.localhost
+  tls: []
+
+defaults:
+  replicas: 1
+  resources:
+    requests:
+      cpu: 100m
+      memory: 192Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  hpa:
+    minReplicas: 1
+    maxReplicas: 2
+
+services:
+  api-gateway:
+    replicas: 2
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 500m
+        memory: 384Mi
+    hpa:
+      minReplicas: 1
+      maxReplicas: 2
+  auth-service:
+    replicas: 2
+    hpa:
+      minReplicas: 1
+      maxReplicas: 2

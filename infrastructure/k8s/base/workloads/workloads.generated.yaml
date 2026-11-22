@@ -1,0 +1,1450 @@
+# GENERATED FILE — DO NOT EDIT.
+# Source: infrastructure/k8s/helm/talent-ai
+# Regenerate: pnpm k8s:sync-workloads
+---
+# Source: talent-ai/templates/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: ai-matching-service
+  namespace: talent-ai
+  labels:
+    app.kubernetes.io/name: ai-matching-service
+    app.kubernetes.io/part-of: talent-ai
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: ai-matching-service
+  ports:
+    - name: http
+      port: 5006
+      targetPort: http
+---
+# Source: talent-ai/templates/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: analytics-service
+  namespace: talent-ai
+  labels:
+    app.kubernetes.io/name: analytics-service
+    app.kubernetes.io/part-of: talent-ai
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: analytics-service
+  ports:
+    - name: http
+      port: 5008
+      targetPort: http
+---
+# Source: talent-ai/templates/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: api-gateway
+  namespace: talent-ai
+  labels:
+    app.kubernetes.io/name: api-gateway
+    app.kubernetes.io/part-of: talent-ai
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: api-gateway
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+---
+# Source: talent-ai/templates/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: auth-service
+  namespace: talent-ai
+  labels:
+    app.kubernetes.io/name: auth-service
+    app.kubernetes.io/part-of: talent-ai
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: auth-service
+  ports:
+    - name: http
+      port: 5001
+      targetPort: http
+---
+# Source: talent-ai/templates/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: engagement-service
+  namespace: talent-ai
+  labels:
+    app.kubernetes.io/name: engagement-service
+    app.kubernetes.io/part-of: talent-ai
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: engagement-service
+  ports:
+    - name: http
+      port: 5004
+      targetPort: http
+---
+# Source: talent-ai/templates/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: notification-service
+  namespace: talent-ai
+  labels:
+    app.kubernetes.io/name: notification-service
+    app.kubernetes.io/part-of: talent-ai
+spec:
+  type: ClusterIP
+  sessionAffinity: ClientIP
+  selector:
+    app.kubernetes.io/name: notification-service
+  ports:
+    - name: http
+      port: 5007
+      targetPort: http
+---
+# Source: talent-ai/templates/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: recruiter-service
+  namespace: talent-ai
+  labels:
+    app.kubernetes.io/name: recruiter-service
+    app.kubernetes.io/part-of: talent-ai
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: recruiter-service
+  ports:
+    - name: http
+      port: 5003
+      targetPort: http
+---
+# Source: talent-ai/templates/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: rewards-service
+  namespace: talent-ai
+  labels:
+    app.kubernetes.io/name: rewards-service
+    app.kubernetes.io/part-of: talent-ai
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: rewards-service
+  ports:
+    - name: http
+      port: 5005
+      targetPort: http
+---
+# Source: talent-ai/templates/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: talent-service
+  namespace: talent-ai
+  labels:
+    app.kubernetes.io/name: talent-service
+    app.kubernetes.io/part-of: talent-ai
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: talent-service
+  ports:
+    - name: http
+      port: 5002
+      targetPort: http
+---
+# Source: talent-ai/templates/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ai-matching-service
+  namespace: talent-ai
+  labels:
+    app.kubernetes.io/name: ai-matching-service
+    app.kubernetes.io/component: backend
+    app.kubernetes.io/part-of: talent-ai
+spec:
+  replicas: 2
+  revisionHistoryLimit: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: ai-matching-service
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: ai-matching-service
+        app.kubernetes.io/component: backend
+        app.kubernetes.io/part-of: talent-ai
+      annotations:
+        prometheus.io/scrape: 'true'
+        prometheus.io/port: '5006'
+        prometheus.io/path: /metrics
+    spec:
+      serviceAccountName: talent-ai-ai-matching-service
+      automountServiceAccountToken: false
+      securityContext:
+        fsGroup: 1000
+        runAsNonRoot: true
+        runAsUser: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: ai-matching-service
+      containers:
+        - name: ai-matching-service
+          image: 'ghcr.io/vijeshvs/smart-match/ai-matching-service:latest'
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 5006
+          envFrom:
+            - configMapRef:
+                name: talent-ai-config
+            - secretRef:
+                name: talent-ai-secrets
+          env:
+            - name: PORT
+              value: '5006'
+            - name: TRUST_GATEWAY_HEADERS
+              value: 'true'
+          readinessProbe:
+            httpGet:
+              path: /health/readiness
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 15
+            timeoutSeconds: 5
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /health/liveness
+              port: http
+            initialDelaySeconds: 20
+            periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 3
+          resources:
+            limits:
+              cpu: 500m
+              memory: 512Mi
+            requests:
+              cpu: 100m
+              memory: 192Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            readOnlyRootFilesystem: true
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
+---
+# Source: talent-ai/templates/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: analytics-service
+  namespace: talent-ai
+  labels:
+    app.kubernetes.io/name: analytics-service
+    app.kubernetes.io/component: backend
+    app.kubernetes.io/part-of: talent-ai
+spec:
+  replicas: 2
+  revisionHistoryLimit: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: analytics-service
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: analytics-service
+        app.kubernetes.io/component: backend
+        app.kubernetes.io/part-of: talent-ai
+      annotations:
+        prometheus.io/scrape: 'true'
+        prometheus.io/port: '5008'
+        prometheus.io/path: /metrics
+    spec:
+      serviceAccountName: talent-ai-analytics-service
+      automountServiceAccountToken: false
+      securityContext:
+        fsGroup: 1000
+        runAsNonRoot: true
+        runAsUser: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: analytics-service
+      containers:
+        - name: analytics-service
+          image: 'ghcr.io/vijeshvs/smart-match/analytics-service:latest'
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 5008
+          envFrom:
+            - configMapRef:
+                name: talent-ai-config
+            - secretRef:
+                name: talent-ai-secrets
+          env:
+            - name: PORT
+              value: '5008'
+            - name: TRUST_GATEWAY_HEADERS
+              value: 'true'
+          readinessProbe:
+            httpGet:
+              path: /health/readiness
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 15
+            timeoutSeconds: 5
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /health/liveness
+              port: http
+            initialDelaySeconds: 20
+            periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 3
+          resources:
+            limits:
+              cpu: 500m
+              memory: 512Mi
+            requests:
+              cpu: 100m
+              memory: 192Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            readOnlyRootFilesystem: true
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
+---
+# Source: talent-ai/templates/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api-gateway
+  namespace: talent-ai
+  labels:
+    app.kubernetes.io/name: api-gateway
+    app.kubernetes.io/component: edge
+    app.kubernetes.io/part-of: talent-ai
+spec:
+  replicas: 2
+  revisionHistoryLimit: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: api-gateway
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: api-gateway
+        app.kubernetes.io/component: edge
+        app.kubernetes.io/part-of: talent-ai
+      annotations:
+        prometheus.io/scrape: 'true'
+        prometheus.io/port: '8080'
+        prometheus.io/path: /metrics
+    spec:
+      serviceAccountName: talent-ai-api-gateway
+      automountServiceAccountToken: false
+      securityContext:
+        fsGroup: 1000
+        runAsNonRoot: true
+        runAsUser: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: api-gateway
+      containers:
+        - name: api-gateway
+          image: 'ghcr.io/vijeshvs/smart-match/api-gateway:latest'
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8080
+          envFrom:
+            - configMapRef:
+                name: talent-ai-config
+            - secretRef:
+                name: talent-ai-secrets
+          readinessProbe:
+            httpGet:
+              path: /health/readiness
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 15
+            timeoutSeconds: 5
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /health/liveness
+              port: http
+            initialDelaySeconds: 15
+            periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 3
+          resources:
+            limits:
+              cpu: 500m
+              memory: 384Mi
+            requests:
+              cpu: 100m
+              memory: 128Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            readOnlyRootFilesystem: true
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
+---
+# Source: talent-ai/templates/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: auth-service
+  namespace: talent-ai
+  labels:
+    app.kubernetes.io/name: auth-service
+    app.kubernetes.io/component: backend
+    app.kubernetes.io/part-of: talent-ai
+spec:
+  replicas: 2
+  revisionHistoryLimit: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: auth-service
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: auth-service
+        app.kubernetes.io/component: backend
+        app.kubernetes.io/part-of: talent-ai
+      annotations:
+        prometheus.io/scrape: 'true'
+        prometheus.io/port: '5001'
+        prometheus.io/path: /metrics
+    spec:
+      serviceAccountName: talent-ai-auth-service
+      automountServiceAccountToken: false
+      securityContext:
+        fsGroup: 1000
+        runAsNonRoot: true
+        runAsUser: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: auth-service
+      containers:
+        - name: auth-service
+          image: 'ghcr.io/vijeshvs/smart-match/auth-service:latest'
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 5001
+          envFrom:
+            - configMapRef:
+                name: talent-ai-config
+            - secretRef:
+                name: talent-ai-secrets
+          env:
+            - name: PORT
+              value: '5001'
+          readinessProbe:
+            httpGet:
+              path: /health/readiness
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 15
+            timeoutSeconds: 5
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /health/liveness
+              port: http
+            initialDelaySeconds: 20
+            periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 3
+          resources:
+            limits:
+              cpu: 500m
+              memory: 512Mi
+            requests:
+              cpu: 100m
+              memory: 192Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            readOnlyRootFilesystem: true
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
+---
+# Source: talent-ai/templates/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: engagement-service
+  namespace: talent-ai
+  labels:
+    app.kubernetes.io/name: engagement-service
+    app.kubernetes.io/component: backend
+    app.kubernetes.io/part-of: talent-ai
+spec:
+  replicas: 2
+  revisionHistoryLimit: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: engagement-service
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: engagement-service
+        app.kubernetes.io/component: backend
+        app.kubernetes.io/part-of: talent-ai
+      annotations:
+        prometheus.io/scrape: 'true'
+        prometheus.io/port: '5004'
+        prometheus.io/path: /metrics
+    spec:
+      serviceAccountName: talent-ai-engagement-service
+      automountServiceAccountToken: false
+      securityContext:
+        fsGroup: 1000
+        runAsNonRoot: true
+        runAsUser: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: engagement-service
+      containers:
+        - name: engagement-service
+          image: 'ghcr.io/vijeshvs/smart-match/engagement-service:latest'
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 5004
+          envFrom:
+            - configMapRef:
+                name: talent-ai-config
+            - secretRef:
+                name: talent-ai-secrets
+          env:
+            - name: PORT
+              value: '5004'
+            - name: TRUST_GATEWAY_HEADERS
+              value: 'true'
+          readinessProbe:
+            httpGet:
+              path: /health/readiness
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 15
+            timeoutSeconds: 5
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /health/liveness
+              port: http
+            initialDelaySeconds: 20
+            periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 3
+          resources:
+            limits:
+              cpu: 500m
+              memory: 512Mi
+            requests:
+              cpu: 100m
+              memory: 192Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            readOnlyRootFilesystem: true
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
+---
+# Source: talent-ai/templates/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: notification-service
+  namespace: talent-ai
+  labels:
+    app.kubernetes.io/name: notification-service
+    app.kubernetes.io/component: backend
+    app.kubernetes.io/part-of: talent-ai
+spec:
+  replicas: 2
+  revisionHistoryLimit: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: notification-service
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: notification-service
+        app.kubernetes.io/component: backend
+        app.kubernetes.io/part-of: talent-ai
+      annotations:
+        prometheus.io/scrape: 'true'
+        prometheus.io/port: '5007'
+        prometheus.io/path: /metrics
+    spec:
+      serviceAccountName: talent-ai-notification-service
+      automountServiceAccountToken: false
+      securityContext:
+        fsGroup: 1000
+        runAsNonRoot: true
+        runAsUser: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: notification-service
+      containers:
+        - name: notification-service
+          image: 'ghcr.io/vijeshvs/smart-match/notification-service:latest'
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 5007
+          envFrom:
+            - configMapRef:
+                name: talent-ai-config
+            - secretRef:
+                name: talent-ai-secrets
+          env:
+            - name: PORT
+              value: '5007'
+            - name: NOTIFICATION_MONGODB_DB
+              value: talent_notif
+            - name: TRUST_GATEWAY_HEADERS
+              value: 'true'
+          readinessProbe:
+            httpGet:
+              path: /health/readiness
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 15
+            timeoutSeconds: 5
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /health/liveness
+              port: http
+            initialDelaySeconds: 20
+            periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 3
+          resources:
+            limits:
+              cpu: 500m
+              memory: 512Mi
+            requests:
+              cpu: 100m
+              memory: 192Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            readOnlyRootFilesystem: true
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
+---
+# Source: talent-ai/templates/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: recruiter-service
+  namespace: talent-ai
+  labels:
+    app.kubernetes.io/name: recruiter-service
+    app.kubernetes.io/component: backend
+    app.kubernetes.io/part-of: talent-ai
+spec:
+  replicas: 2
+  revisionHistoryLimit: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: recruiter-service
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: recruiter-service
+        app.kubernetes.io/component: backend
+        app.kubernetes.io/part-of: talent-ai
+      annotations:
+        prometheus.io/scrape: 'true'
+        prometheus.io/port: '5003'
+        prometheus.io/path: /metrics
+    spec:
+      serviceAccountName: talent-ai-recruiter-service
+      automountServiceAccountToken: false
+      securityContext:
+        fsGroup: 1000
+        runAsNonRoot: true
+        runAsUser: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: recruiter-service
+      containers:
+        - name: recruiter-service
+          image: 'ghcr.io/vijeshvs/smart-match/recruiter-service:latest'
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 5003
+          envFrom:
+            - configMapRef:
+                name: talent-ai-config
+            - secretRef:
+                name: talent-ai-secrets
+          env:
+            - name: PORT
+              value: '5003'
+            - name: TRUST_GATEWAY_HEADERS
+              value: 'true'
+          readinessProbe:
+            httpGet:
+              path: /health/readiness
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 15
+            timeoutSeconds: 5
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /health/liveness
+              port: http
+            initialDelaySeconds: 20
+            periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 3
+          resources:
+            limits:
+              cpu: 500m
+              memory: 512Mi
+            requests:
+              cpu: 100m
+              memory: 192Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            readOnlyRootFilesystem: true
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
+---
+# Source: talent-ai/templates/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rewards-service
+  namespace: talent-ai
+  labels:
+    app.kubernetes.io/name: rewards-service
+    app.kubernetes.io/component: backend
+    app.kubernetes.io/part-of: talent-ai
+spec:
+  replicas: 2
+  revisionHistoryLimit: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: rewards-service
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: rewards-service
+        app.kubernetes.io/component: backend
+        app.kubernetes.io/part-of: talent-ai
+      annotations:
+        prometheus.io/scrape: 'true'
+        prometheus.io/port: '5005'
+        prometheus.io/path: /metrics
+    spec:
+      serviceAccountName: talent-ai-rewards-service
+      automountServiceAccountToken: false
+      securityContext:
+        fsGroup: 1000
+        runAsNonRoot: true
+        runAsUser: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: rewards-service
+      containers:
+        - name: rewards-service
+          image: 'ghcr.io/vijeshvs/smart-match/rewards-service:latest'
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 5005
+          envFrom:
+            - configMapRef:
+                name: talent-ai-config
+            - secretRef:
+                name: talent-ai-secrets
+          env:
+            - name: PORT
+              value: '5005'
+            - name: TRUST_GATEWAY_HEADERS
+              value: 'true'
+          readinessProbe:
+            httpGet:
+              path: /health/readiness
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 15
+            timeoutSeconds: 5
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /health/liveness
+              port: http
+            initialDelaySeconds: 20
+            periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 3
+          resources:
+            limits:
+              cpu: 500m
+              memory: 512Mi
+            requests:
+              cpu: 100m
+              memory: 192Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            readOnlyRootFilesystem: true
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
+---
+# Source: talent-ai/templates/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: talent-service
+  namespace: talent-ai
+  labels:
+    app.kubernetes.io/name: talent-service
+    app.kubernetes.io/component: backend
+    app.kubernetes.io/part-of: talent-ai
+spec:
+  replicas: 2
+  revisionHistoryLimit: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: talent-service
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: talent-service
+        app.kubernetes.io/component: backend
+        app.kubernetes.io/part-of: talent-ai
+      annotations:
+        prometheus.io/scrape: 'true'
+        prometheus.io/port: '5002'
+        prometheus.io/path: /metrics
+    spec:
+      serviceAccountName: talent-ai-talent-service
+      automountServiceAccountToken: false
+      securityContext:
+        fsGroup: 1000
+        runAsNonRoot: true
+        runAsUser: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: talent-service
+      containers:
+        - name: talent-service
+          image: 'ghcr.io/vijeshvs/smart-match/talent-service:latest'
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 5002
+          envFrom:
+            - configMapRef:
+                name: talent-ai-config
+            - secretRef:
+                name: talent-ai-secrets
+          env:
+            - name: PORT
+              value: '5002'
+            - name: MONGODB_DB
+              value: talent_profiles
+            - name: TRUST_GATEWAY_HEADERS
+              value: 'true'
+          readinessProbe:
+            httpGet:
+              path: /health/readiness
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 15
+            timeoutSeconds: 5
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /health/liveness
+              port: http
+            initialDelaySeconds: 20
+            periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 3
+          resources:
+            limits:
+              cpu: 500m
+              memory: 512Mi
+            requests:
+              cpu: 100m
+              memory: 192Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            readOnlyRootFilesystem: true
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
+---
+# Source: talent-ai/templates/hpa.yaml
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: ai-matching-service
+  namespace: talent-ai
+  labels:
+    app.kubernetes.io/name: ai-matching-service
+    app.kubernetes.io/part-of: talent-ai
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: ai-matching-service
+  minReplicas: 2
+  maxReplicas: 10
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+        - type: Percent
+          value: 50
+          periodSeconds: 60
+    scaleUp:
+      stabilizationWindowSeconds: 30
+      policies:
+        - type: Percent
+          value: 100
+          periodSeconds: 30
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 80
+---
+# Source: talent-ai/templates/hpa.yaml
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: analytics-service
+  namespace: talent-ai
+  labels:
+    app.kubernetes.io/name: analytics-service
+    app.kubernetes.io/part-of: talent-ai
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: analytics-service
+  minReplicas: 2
+  maxReplicas: 8
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+        - type: Percent
+          value: 50
+          periodSeconds: 60
+    scaleUp:
+      stabilizationWindowSeconds: 30
+      policies:
+        - type: Percent
+          value: 100
+          periodSeconds: 30
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 80
+---
+# Source: talent-ai/templates/hpa.yaml
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: api-gateway
+  namespace: talent-ai
+  labels:
+    app.kubernetes.io/name: api-gateway
+    app.kubernetes.io/part-of: talent-ai
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: api-gateway
+  minReplicas: 2
+  maxReplicas: 12
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+        - type: Percent
+          value: 50
+          periodSeconds: 60
+    scaleUp:
+      stabilizationWindowSeconds: 30
+      policies:
+        - type: Percent
+          value: 100
+          periodSeconds: 30
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 65
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 80
+---
+# Source: talent-ai/templates/hpa.yaml
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: auth-service
+  namespace: talent-ai
+  labels:
+    app.kubernetes.io/name: auth-service
+    app.kubernetes.io/part-of: talent-ai
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: auth-service
+  minReplicas: 2
+  maxReplicas: 10
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+        - type: Percent
+          value: 50
+          periodSeconds: 60
+    scaleUp:
+      stabilizationWindowSeconds: 30
+      policies:
+        - type: Percent
+          value: 100
+          periodSeconds: 30
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 80
+---
+# Source: talent-ai/templates/hpa.yaml
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: engagement-service
+  namespace: talent-ai
+  labels:
+    app.kubernetes.io/name: engagement-service
+    app.kubernetes.io/part-of: talent-ai
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: engagement-service
+  minReplicas: 2
+  maxReplicas: 10
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+        - type: Percent
+          value: 50
+          periodSeconds: 60
+    scaleUp:
+      stabilizationWindowSeconds: 30
+      policies:
+        - type: Percent
+          value: 100
+          periodSeconds: 30
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 80
+---
+# Source: talent-ai/templates/hpa.yaml
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: notification-service
+  namespace: talent-ai
+  labels:
+    app.kubernetes.io/name: notification-service
+    app.kubernetes.io/part-of: talent-ai
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: notification-service
+  minReplicas: 2
+  maxReplicas: 6
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+        - type: Percent
+          value: 50
+          periodSeconds: 60
+    scaleUp:
+      stabilizationWindowSeconds: 30
+      policies:
+        - type: Percent
+          value: 100
+          periodSeconds: 30
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 80
+---
+# Source: talent-ai/templates/hpa.yaml
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: recruiter-service
+  namespace: talent-ai
+  labels:
+    app.kubernetes.io/name: recruiter-service
+    app.kubernetes.io/part-of: talent-ai
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: recruiter-service
+  minReplicas: 2
+  maxReplicas: 10
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+        - type: Percent
+          value: 50
+          periodSeconds: 60
+    scaleUp:
+      stabilizationWindowSeconds: 30
+      policies:
+        - type: Percent
+          value: 100
+          periodSeconds: 30
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 80
+---
+# Source: talent-ai/templates/hpa.yaml
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: rewards-service
+  namespace: talent-ai
+  labels:
+    app.kubernetes.io/name: rewards-service
+    app.kubernetes.io/part-of: talent-ai
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: rewards-service
+  minReplicas: 2
+  maxReplicas: 10
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+        - type: Percent
+          value: 50
+          periodSeconds: 60
+    scaleUp:
+      stabilizationWindowSeconds: 30
+      policies:
+        - type: Percent
+          value: 100
+          periodSeconds: 30
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 80
+---
+# Source: talent-ai/templates/hpa.yaml
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: talent-service
+  namespace: talent-ai
+  labels:
+    app.kubernetes.io/name: talent-service
+    app.kubernetes.io/part-of: talent-ai
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: talent-service
+  minReplicas: 2
+  maxReplicas: 10
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+        - type: Percent
+          value: 50
+          periodSeconds: 60
+    scaleUp:
+      stabilizationWindowSeconds: 30
+      policies:
+        - type: Percent
+          value: 100
+          periodSeconds: 30
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 80

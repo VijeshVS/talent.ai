@@ -1,0 +1,27 @@
+talent.ai workload chart — Phase 12
+===================================
+
+This chart rendered the workload layer only:
+
+  Deployments:                {{ len .Values.services }}
+  Services:                   {{ len .Values.services }}
+  HorizontalPodAutoscalers:   {{ len .Values.services }}
+
+It did NOT create:
+
+  Namespace, ServiceAccounts, RBAC
+  ConfigMap/{{ .Values.configMapName }}
+  Secret/{{ .Values.secretName }}
+  Ingress, NetworkPolicies
+  ResourceQuota, LimitRange, PodDisruptionBudgets, PriorityClasses
+
+The pods rendered here depend on ConfigMap/{{ .Values.configMapName }} and
+Secret/{{ .Values.secretName }} already existing in namespace
+{{ .Values.namespace }}. A standalone `helm install` therefore produces pods
+that fail on missing configuration. It does not yield a working application.
+
+Supported Phase 12 path:
+
+  kubectl apply -k infrastructure/k8s/overlays/<dev|staging|production>
+
+See infrastructure/k8s/README.md and docs/phase-12-kubernetes-platform.md.

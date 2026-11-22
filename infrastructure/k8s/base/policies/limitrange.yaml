@@ -1,0 +1,18 @@
+# Defaults applied at Pod creation, so an un-resourced container cannot bypass
+# quota accounting.
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: talent-ai-defaults
+  namespace: talent-ai
+  labels:
+    app.kubernetes.io/part-of: talent-ai
+spec:
+  limits:
+    - type: Container
+      defaultRequest:
+        cpu: 100m
+        memory: 128Mi
+      default:
+        cpu: 500m
+        memory: 512Mi

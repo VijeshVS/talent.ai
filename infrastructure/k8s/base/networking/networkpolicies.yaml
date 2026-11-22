@@ -1,0 +1,550 @@
+# Phase 12 NetworkPolicies — concrete, directional, no unrestricted egress.
+#
+# Selector verification (see docs/phase-12-kubernetes-platform.md):
+#   app.kubernetes.io/name       present on all nine Deployment pod templates
+#   app.kubernetes.io/component  `backend` on eight services, `edge` on api-gateway
+#   app.kubernetes.io/name: prometheus / grafana  present on the Phase 11 pods
+#
+# Namespace selectors use the automatic `kubernetes.io/metadata.name` label.
+# No ipBlock is used anywhere. No 0.0.0.0/0 egress exists.
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-ingress
+  namespace: talent-ai
+  labels:
+    app.kubernetes.io/part-of: talent-ai
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-egress
+  namespace: talent-ai
+  labels:
+    app.kubernetes.io/part-of: talent-ai
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-dns-egress
+  namespace: talent-ai
+  labels:
+    app.kubernetes.io/part-of: talent-ai
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-ingress-controller-gateway
+  namespace: talent-ai
+  labels:
+    app.kubernetes.io/part-of: talent-ai
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: api-gateway
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ingress-nginx
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: ingress-nginx
+      ports:
+        - protocol: TCP
+          port: 8080
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-ingress-controller-notification
+  namespace: talent-ai
+  labels:
+    app.kubernetes.io/part-of: talent-ai
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: notification-service
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ingress-nginx
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: ingress-nginx
+      ports:
+        - protocol: TCP
+          port: 5007
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-gateway-egress
+  namespace: talent-ai
+  labels:
+    app.kubernetes.io/part-of: talent-ai
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: api-gateway
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/component: backend
+      ports:
+        - protocol: TCP
+          port: 5001
+        - protocol: TCP
+          port: 5002
+        - protocol: TCP
+          port: 5003
+        - protocol: TCP
+          port: 5004
+        - protocol: TCP
+          port: 5005
+        - protocol: TCP
+          port: 5006
+        - protocol: TCP
+          port: 5007
+        - protocol: TCP
+          port: 5008
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-gateway-to-backends
+  namespace: talent-ai
+  labels:
+    app.kubernetes.io/part-of: talent-ai
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/component: backend
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: api-gateway
+      ports:
+        - protocol: TCP
+          port: 5001
+        - protocol: TCP
+          port: 5002
+        - protocol: TCP
+          port: 5003
+        - protocol: TCP
+          port: 5004
+        - protocol: TCP
+          port: 5005
+        - protocol: TCP
+          port: 5006
+        - protocol: TCP
+          port: 5007
+        - protocol: TCP
+          port: 5008
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-prometheus-scrape
+  namespace: talent-ai
+  labels:
+    app.kubernetes.io/part-of: talent-ai
+spec:
+  podSelector:
+    matchExpressions:
+      - key: app.kubernetes.io/component
+        operator: In
+        values:
+          - backend
+          - edge
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: prometheus
+      ports:
+        - protocol: TCP
+          port: 5001
+        - protocol: TCP
+          port: 5002
+        - protocol: TCP
+          port: 5003
+        - protocol: TCP
+          port: 5004
+        - protocol: TCP
+          port: 5005
+        - protocol: TCP
+          port: 5006
+        - protocol: TCP
+          port: 5007
+        - protocol: TCP
+          port: 5008
+        - protocol: TCP
+          port: 8080
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-prometheus-egress
+  namespace: talent-ai
+  labels:
+    app.kubernetes.io/part-of: talent-ai
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: prometheus
+  policyTypes:
+    - Egress
+  egress:
+    # Application /metrics endpoints.
+    - to:
+        - podSelector:
+            matchExpressions:
+              - key: app.kubernetes.io/component
+                operator: In
+                values:
+                  - backend
+                  - edge
+      ports:
+        - protocol: TCP
+          port: 5001
+        - protocol: TCP
+          port: 5002
+        - protocol: TCP
+          port: 5003
+        - protocol: TCP
+          port: 5004
+        - protocol: TCP
+          port: 5005
+        - protocol: TCP
+          port: 5006
+        - protocol: TCP
+          port: 5007
+        - protocol: TCP
+          port: 5008
+        - protocol: TCP
+          port: 8080
+    # Datastore exporters. Phase 12 has no pods here; the label selectors are
+    # the contract Phase 13 must satisfy. Both namespaces are listed because the
+    # Phase 11 scrape config uses same-namespace short names while the datastore
+    # landing zone is talent-ai-data. Phase 13 repoints the targets and the
+    # same-namespace peer can then be removed.
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: talent-ai-data
+          podSelector:
+            matchExpressions:
+              - key: app.kubernetes.io/name
+                operator: In
+                values:
+                  - postgres-exporter
+                  - redis-exporter
+                  - mongodb-exporter
+                  - rabbitmq
+                  - qdrant
+        - podSelector:
+            matchExpressions:
+              - key: app.kubernetes.io/name
+                operator: In
+                values:
+                  - postgres-exporter
+                  - redis-exporter
+                  - mongodb-exporter
+                  - rabbitmq
+                  - qdrant
+      ports:
+        - protocol: TCP
+          port: 9187
+        - protocol: TCP
+          port: 9121
+        - protocol: TCP
+          port: 9216
+        - protocol: TCP
+          port: 15692
+        - protocol: TCP
+          port: 6333
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-grafana-egress
+  namespace: talent-ai
+  labels:
+    app.kubernetes.io/part-of: talent-ai
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: grafana
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: prometheus
+      ports:
+        - protocol: TCP
+          port: 9090
+    # Grafana's provisioned "Analytics PostgreSQL" datasource. No datastore
+    # exists in Phase 12; the selectors are the Phase 13 contract. Both
+    # namespaces are listed because the Phase 11 manifest points at
+    # postgres.talent-ai while datastores land in talent-ai-data.
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: talent-ai-data
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: postgres
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: postgres
+      ports:
+        - protocol: TCP
+          port: 5432
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-prometheus-ingress
+  namespace: talent-ai
+  labels:
+    app.kubernetes.io/part-of: talent-ai
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: prometheus
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: grafana
+      ports:
+        - protocol: TCP
+          port: 9090
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-egress-datastores
+  namespace: talent-ai
+  labels:
+    app.kubernetes.io/part-of: talent-ai
+spec:
+  podSelector:
+    matchExpressions:
+      - key: app.kubernetes.io/component
+        operator: In
+        values:
+          - backend
+          - edge
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: talent-ai-data
+          podSelector:
+            matchExpressions:
+              - key: app.kubernetes.io/name
+                operator: In
+                values:
+                  - postgres
+                  - mongodb
+                  - redis
+                  - rabbitmq
+                  - qdrant
+      ports:
+        - protocol: TCP
+          port: 5432
+        - protocol: TCP
+          port: 27017
+        - protocol: TCP
+          port: 6379
+        - protocol: TCP
+          port: 5672
+        - protocol: TCP
+          port: 6333
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-egress-otlp
+  namespace: talent-ai
+  labels:
+    app.kubernetes.io/part-of: talent-ai
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+  egress:
+    # Inert in Phase 12: no jaeger-collector pod exists. The endpoint in
+    # ConfigMap/talent-ai-config points at this name, so enabling OTEL later
+    # only requires deploying the collector.
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: jaeger-collector
+      ports:
+        - protocol: TCP
+          port: 4318
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: data-default-deny
+  namespace: talent-ai-data
+  labels:
+    app.kubernetes.io/part-of: talent-ai
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-from-app
+  namespace: talent-ai-data
+  labels:
+    app.kubernetes.io/part-of: talent-ai
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: talent-ai
+          podSelector:
+            matchExpressions:
+              - key: app.kubernetes.io/component
+                operator: In
+                values:
+                  - backend
+                  - edge
+      ports:
+        - protocol: TCP
+          port: 5432
+        - protocol: TCP
+          port: 27017
+        - protocol: TCP
+          port: 6379
+        - protocol: TCP
+          port: 5672
+        - protocol: TCP
+          port: 6333
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-from-prometheus
+  namespace: talent-ai-data
+  labels:
+    app.kubernetes.io/part-of: talent-ai
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: talent-ai
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: prometheus
+      ports:
+        - protocol: TCP
+          port: 9187
+        - protocol: TCP
+          port: 9121
+        - protocol: TCP
+          port: 9216
+        - protocol: TCP
+          port: 15692
+        - protocol: TCP
+          port: 6333
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: data-allow-dns-egress
+  namespace: talent-ai-data
+  labels:
+    app.kubernetes.io/part-of: talent-ai
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: platform-default-deny
+  namespace: talent-ai-platform
+  labels:
+    app.kubernetes.io/part-of: talent-ai
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress

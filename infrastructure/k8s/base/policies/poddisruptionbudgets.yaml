@@ -1,0 +1,122 @@
+# PDBs protect VOLUNTARY disruptions (drains, eviction API, node upgrades).
+# They are NOT honoured during node-pressure eviction; PriorityClass governs
+# that ordering instead. See docs/phase-12-kubernetes-platform.md §8.4.
+#
+# dev deletes these objects because most dev Deployments run one replica, where
+# minAvailable: 1 would block every drain.
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: api-gateway
+  namespace: talent-ai
+  labels:
+    app.kubernetes.io/part-of: talent-ai
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: api-gateway
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: auth-service
+  namespace: talent-ai
+  labels:
+    app.kubernetes.io/part-of: talent-ai
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: auth-service
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: talent-service
+  namespace: talent-ai
+  labels:
+    app.kubernetes.io/part-of: talent-ai
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: talent-service
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: recruiter-service
+  namespace: talent-ai
+  labels:
+    app.kubernetes.io/part-of: talent-ai
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: recruiter-service
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: engagement-service
+  namespace: talent-ai
+  labels:
+    app.kubernetes.io/part-of: talent-ai
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: engagement-service
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: rewards-service
+  namespace: talent-ai
+  labels:
+    app.kubernetes.io/part-of: talent-ai
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: rewards-service
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: ai-matching-service
+  namespace: talent-ai
+  labels:
+    app.kubernetes.io/part-of: talent-ai
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: ai-matching-service
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: notification-service
+  namespace: talent-ai
+  labels:
+    app.kubernetes.io/part-of: talent-ai
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: notification-service
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: analytics-service
+  namespace: talent-ai
+  labels:
+    app.kubernetes.io/part-of: talent-ai
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: analytics-service

@@ -1,0 +1,45 @@
+# QUARANTINED — not referenced by any kustomization.
+#
+# These portal rules are preserved from the Phase 9.5 ingress. They are inert:
+# no candidate-portal or recruiter-portal Service exists, and no portal image
+# exists in this repository. They are kept here so the intent is not lost when
+# the portal deployment phase lands.
+#
+# To activate, add the two Services and move these rules back into ingress.yaml.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: talent-ai-portals-pending
+  namespace: talent-ai
+  labels:
+    app.kubernetes.io/part-of: talent-ai
+  annotations:
+    talent.ai/status: pending-portal-deployment
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - talent.ai
+        - recruiter.talent.ai
+      secretName: talent-ai-tls
+  rules:
+    - host: talent.ai
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: candidate-portal
+                port:
+                  number: 80
+    - host: recruiter.talent.ai
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: recruiter-portal
+                port:
+                  number: 80

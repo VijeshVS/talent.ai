@@ -1,0 +1,34 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: talent-ai
+  labels:
+    app.kubernetes.io/part-of: talent-ai
+    # Prometheus and Grafana are preserved Phase 11 assets that run as root and
+    # carry no securityContext, so `restricted` enforcement would reject them.
+    # The nine application pods satisfy `restricted` and are held to it by the
+    # conftest policy regardless of this namespace setting.
+    pod-security.kubernetes.io/enforce: baseline
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/warn: restricted
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: talent-ai-platform
+  labels:
+    app.kubernetes.io/part-of: talent-ai
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/warn: restricted
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: talent-ai-data
+  labels:
+    app.kubernetes.io/part-of: talent-ai
+    # Declared and labelled only. No datastore is deployed in Phase 12.
+    pod-security.kubernetes.io/enforce: baseline
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/warn: restricted

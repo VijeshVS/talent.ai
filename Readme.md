@@ -105,8 +105,9 @@ recruiter-portal ─┘               ├─→ talent-service
   fan-out and branded email, plus event-sourced analytics read models guarded by
   consumer idempotency.
 - **Delivery** — multi-stage Docker images, a unified Compose stack, Kubernetes
-  manifests with HPA and ingress, and GitHub Actions pipelines that build and
-  push images to GHCR.
+  manifests with HPA and ingress, a layered Kubernetes platform (Helm workloads,
+  Kustomize platform and environment overlays), and GitHub Actions pipelines
+  that build and push images to GHCR.
 
 ---
 
@@ -293,8 +294,25 @@ Alert rules and their runbooks are documented in
 `pnpm dashboards:generate`.
 
 Deployment assets live in [`infrastructure/docker`](infrastructure/docker/README.md)
-and [`infrastructure/k8s`](infrastructure/k8s/README.md). Apply the full
-Kubernetes stack, including observability, with `kubectl apply -k infrastructure`.
+and [`infrastructure/k8s`](infrastructure/k8s/README.md). The Kubernetes platform
+is layered: a Helm chart owns the nine workloads, a Kustomize base owns
+namespaces, RBAC, configuration, networking and policy, and `dev` / `staging` /
+`production` overlays carry environment differences.
+
+```bash
+pnpm k8s:local:up                                  # one-command local kind stack
+kubectl apply -k infrastructure/k8s/overlays/dev   # dev shape (replace digests first)
+kubectl apply -k infrastructure                    # production platform + observability
+pnpm k8s:validate                                  # render, schema, policy, capacity
+```
+
+`pnpm k8s:local:up` builds the nine service images, loads them into a
+single-node kind cluster, deploys ephemeral datastores, runs migrations and
+port-forwards the gateway. `dev` / `staging` / `production` ship digest
+placeholders and are not deployable until the release workflow writes real
+digests. See
+[`docs/phase-12-kubernetes-platform.md`](docs/phase-12-kubernetes-platform.md).
+
 The CI matrix builds and publishes service images to GHCR on `main` and version
 tags.
 
@@ -307,6 +325,7 @@ tags.
 | [`TODO.md`](TODO.md) | Phase-by-phase delivery roadmap and ownership. |
 | [`docs/BRAND_GUIDELINES.md`](docs/BRAND_GUIDELINES.md) | Brand, product vocabulary, colour, and UI rules. |
 | [`docs/phase-11-observability.md`](docs/phase-11-observability.md) | Dashboards, metrics, alerts, provisioning, and verification. |
+| [`docs/phase-12-kubernetes-platform.md`](docs/phase-12-kubernetes-platform.md) | Kubernetes layers, networking matrix, quota derivation, and validation. |
 | [`docs/runbooks/README.md`](docs/runbooks/README.md) | Alert-to-runbook index and incident triage. |
 | [`tools/realistic-seeder/README.md`](tools/realistic-seeder/README.md) | Deterministic cross-store seeder options and safety. |
 | [`services/README.md`](services/README.md) | Service catalogue and observability contract. |
