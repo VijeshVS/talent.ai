@@ -12,6 +12,9 @@ build/
 # Turbo
 .turbo/
 
+# Local Kubernetes runner state (port-forward PIDs, logs)
+.k8s-local/
+
 # Test output
 coverage/
 playwright-report/

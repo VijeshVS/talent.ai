@@ -20,7 +20,8 @@ committed file is stale.
 ## Apply
 
 ```bash
-# local / dev — the only deployable render
+# dev — validated shape; replace the sha256:0000… placeholders with real
+# digests before applying (or use the local profile below)
 kubectl apply -k infrastructure/k8s/overlays/dev
 
 # staging / production — replace the sha256:0000… digest placeholders first
@@ -38,6 +39,41 @@ kubectl apply -k infrastructure       # production platform + observability
 Both render the production overlay and therefore inherit its digest
 placeholders. They are not deployable until the release workflow writes real
 digests.
+
+## Local single-node profile
+
+`overlays/local` is a laptop profile for kind. It inherits `dev` and adds
+in-cluster datastores, one replica per service, and locally built images. It is
+not part of `pnpm k8s:validate`.
+
+```bash
+pnpm k8s:local:up                 # build, load, deploy, migrate, port-forward
+pnpm k8s:local:up --with-portals  # also start the Vite portals on the host
+pnpm k8s:local:status
+pnpm k8s:local:logs api-gateway
+pnpm k8s:local:down               # stop everything and delete the kind cluster
+```
+
+What `up` does:
+
+1. creates (or reuses) a one-node kind cluster from `kind/kind-local.yaml`
+2. builds the nine service images with `docker compose build`
+3. loads them into kind as `talent-ai/<service>:local`
+4. applies the namespaces and creates `Secret/talent-ai-secrets`
+5. deploys Postgres, MongoDB (single-node `rs0`), Redis, RabbitMQ and Qdrant in
+   `talent-ai-data`
+6. runs Prisma migrations and the auth seed through port-forwarded datastores
+7. applies `overlays/local` (one replica per service, HPAs pinned to 1/1)
+8. port-forwards `api-gateway:8080` and `notification-service:5007`
+
+Requirements: Docker Desktop running with about 5 GB of memory, `kind`,
+`kubectl` and `pnpm`. The in-cluster datastores use the local credentials
+`talent` / `talent`. Datastore volumes are `emptyDir`, so data is lost when a
+datastore pod restarts; rerun `pnpm k8s:local:up` to migrate and seed again.
+
+The two portals are not part of the Helm chart. `--with-portals` runs them on
+the host with `VITE_API_GATEWAY_URL=http://localhost:8080` and
+`VITE_NOTIFICATION_WS_URL=ws://localhost:5007/ws/notifications`.
 
 ## Prerequisites
 
@@ -137,8 +173,9 @@ k8s/
 |   +-- networking/         # Ingress, 18 NetworkPolicies, quarantined portal rules
 |   `-- policies/           # ResourceQuota, LimitRange, 9 PDBs, 2 PriorityClasses
 +-- overlays/{dev,staging,production}/
++-- overlays/local/          # single-node laptop profile (kind)
 +-- helm/talent-ai/         # workload chart (source of truth)
-+-- kind/kind-config.yaml   # pinned node image
++-- kind/                   # kind-config.yaml (CI), kind-local.yaml (laptop)
 +-- policies/rego/          # conftest policy
 `-- observability/          # Phase 11 Prometheus + Grafana
 ```
@@ -149,8 +186,10 @@ k8s/
   root; the nine app pods satisfy `restricted` and are held to it by policy.
 - No metrics-server, so HPAs are inert on a fresh cluster.
 - kindnet does not enforce NetworkPolicy; policies are declarative locally.
-- No in-cluster datastores; `talent-ai-data` is declared and empty.
+- No in-cluster datastores in base/staging/production; `talent-ai-data` is
+  declared and empty there. The local profile adds ephemeral datastores.
 - No PVCs; `/tmp` uses `emptyDir`, and Prometheus/Grafana data is ephemeral.
+  The local profile's datastores are `emptyDir` too.
 - Portal ingress rules live in `base/networking/ingress-portals.pending.yaml`
   and are intentionally not referenced.
 

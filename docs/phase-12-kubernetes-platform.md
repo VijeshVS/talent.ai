@@ -33,14 +33,15 @@ In scope:
 | Networking          | 1 Ingress, 18 directional NetworkPolicies                         |
 | Policy              | ResourceQuota, LimitRange, 9 PDBs, 2 PriorityClasses              |
 | Environments        | `dev`, `staging`, `production` overlays                           |
-| CI                  | `.github/workflows/kubernetes-validation.yml`                                       |
+| CI                  | `.github/workflows/kubernetes-validation.yml`                     |
 | Local cluster       | `kind/kind-config.yaml` (pinned node digest)                      |
 
 Out of scope (deferred):
 
 - Cluster provisioning (managed Kubernetes, node pools, autoscaling groups).
 - Ingress controller, cert-manager, metrics-server, CNI installation.
-- Datastores in-cluster (`talent-ai-data` is declared and empty).
+- Datastores in-cluster (`talent-ai-data` is declared and empty outside the
+  local laptop profile).
 - An OpenTelemetry collector or Jaeger deployment.
 - Image build/publish changes and the release workflow that writes digests.
 - Candidate/recruiter portal workloads (rules are quarantined, not active).
@@ -586,6 +587,37 @@ kind create cluster --config infrastructure/k8s/kind/kind-config.yaml
 One control-plane and two workers, all pinned to the node digest above. kindnet
 does not enforce NetworkPolicy (see §11.2).
 
+### 17.1 Laptop profile (`overlays/local`)
+
+`kind/kind-config.yaml` is sized for the CI server-side dry-run, not for running
+the whole stack. `overlays/local` is an additive, local-only profile for a
+single-node kind cluster on a laptop:
+
+```bash
+pnpm k8s:local:up                 # one command: build, load, deploy, migrate
+pnpm k8s:local:up --with-portals  # also run the Vite portals on the host
+pnpm k8s:local:status
+pnpm k8s:local:down
+```
+
+The overlay inherits `dev` and changes only what a laptop needs:
+
+| Change         | Local value                                                          | Reason                         |
+| :------------- | :------------------------------------------------------------------- | :----------------------------- |
+| Replicas       | 1 per service                                                        | memory                         |
+| HPA min/max    | 1/1                                                                  | no metrics-server              |
+| Images         | `talent-ai/<service>:local` via `kind load`                          | no registry/digests            |
+| Datastores     | Postgres, MongoDB `rs0`, Redis, RabbitMQ, Qdrant in `talent-ai-data` | no external Compose dependency |
+| Storage        | `emptyDir`                                                           | no PVCs; data is ephemeral     |
+| CORS / cookies | `http://localhost:3000,3001`, `COOKIE_SECURE=false`                  | host-run portals over HTTP     |
+| Ingress        | left inert; `port-forward` instead                                   | no ingress controller          |
+| Cluster        | one control-plane node (`kind/kind-local.yaml`)                      | 8 GB laptops                   |
+
+The local profile is intentionally **not** part of `pnpm k8s:validate`; the
+three environment overlays remain the validated artefacts. Because kindnet does
+not enforce NetworkPolicy, `kubectl port-forward` reaches the pods even though
+the Ingress path is not installed.
+
 ---
 
 ## 18. Known limitations and follow-ups
@@ -595,12 +627,12 @@ does not enforce NetworkPolicy (see §11.2).
 | No metrics-server                                  | HPAs inert; `replicas` governs         | Cluster bootstrap               |
 | kindnet does not enforce NetworkPolicy             | Policies declarative locally           | Install Calico/Cilium           |
 | staging/production digests are placeholders        | Not deployable as committed            | Release workflow writes digests |
-| No in-cluster datastores                           | Pods fail on connection at runtime     | Phase 13                        |
+| No in-cluster datastores (except `overlays/local`) | Pods fail on connection at runtime     | Phase 13                        |
 | No ingress controller / cert-manager               | Ingress is inert                       | Cluster bootstrap               |
 | Prometheus/Grafana use `emptyDir`                  | Metrics and dashboards lost on restart | Phase 13+                       |
 | Portal ingress rules quarantined                   | Portals have no route                  | Portal deployment phase         |
 | Registry path still `ghcr.io/vijeshvs/smart-match` | Legacy naming                          | Rename with image pipeline      |
-| `talent-ai-data` empty                             | Namespace exists for Phase 13          | Phase 13                        |
+| `talent-ai-data` empty outside `overlays/local`    | Namespace exists for Phase 13          | Phase 13                        |
 
 ---
 

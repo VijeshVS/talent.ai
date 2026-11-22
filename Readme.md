@@ -300,13 +300,17 @@ namespaces, RBAC, configuration, networking and policy, and `dev` / `staging` /
 `production` overlays carry environment differences.
 
 ```bash
-kubectl apply -k infrastructure/k8s/overlays/dev   # deployable local render
+pnpm k8s:local:up                                  # one-command local kind stack
+kubectl apply -k infrastructure/k8s/overlays/dev   # dev shape (replace digests first)
 kubectl apply -k infrastructure                    # production platform + observability
 pnpm k8s:validate                                  # render, schema, policy, capacity
 ```
 
-`staging` and `production` ship digest placeholders and are not deployable until
-the release workflow writes real digests. See
+`pnpm k8s:local:up` builds the nine service images, loads them into a
+single-node kind cluster, deploys ephemeral datastores, runs migrations and
+port-forwards the gateway. `dev` / `staging` / `production` ship digest
+placeholders and are not deployable until the release workflow writes real
+digests. See
 [`docs/phase-12-kubernetes-platform.md`](docs/phase-12-kubernetes-platform.md).
 
 The CI matrix builds and publishes service images to GHCR on `main` and version

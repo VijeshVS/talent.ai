@@ -57,6 +57,11 @@
     "k8s:sync-workloads": "node scripts/k8s/sync-workloads.mjs",
     "k8s:validate": "node scripts/k8s/validate.mjs",
     "k8s:quota": "node scripts/k8s/quota-report.mjs",
+    "k8s:local": "bash scripts/k8s/local-cluster.sh",
+    "k8s:local:up": "bash scripts/k8s/local-cluster.sh up",
+    "k8s:local:down": "bash scripts/k8s/local-cluster.sh down",
+    "k8s:local:status": "bash scripts/k8s/local-cluster.sh status",
+    "k8s:local:logs": "bash scripts/k8s/local-cluster.sh logs",
     "legacy:candidate": "node candidate/backend/index.js",
     "legacy:recruiter": "node hr/backend/index.js",
     "db:migrate:seed": "node scripts/migrate-monolith-to-microservices.mjs"

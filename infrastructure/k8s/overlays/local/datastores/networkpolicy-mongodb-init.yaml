@@ -1,0 +1,22 @@
+# Allows the one-shot replica-set initialiser to reach mongod. The data
+# namespace default-denies egress, so this is required on a policy-capable CNI
+# (kindnet does not enforce NetworkPolicy, but the rule keeps the profile
+# correct if the CNI is swapped).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-mongodb-init
+spec:
+  podSelector:
+    matchLabels:
+      job-name: mongodb-init
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: mongodb
+      ports:
+        - protocol: TCP
+          port: 27017
