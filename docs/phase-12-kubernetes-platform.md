@@ -602,16 +602,17 @@ pnpm k8s:local:down
 
 The overlay inherits `dev` and changes only what a laptop needs:
 
-| Change         | Local value                                                          | Reason                         |
-| :------------- | :------------------------------------------------------------------- | :----------------------------- |
-| Replicas       | 1 per service                                                        | memory                         |
-| HPA min/max    | 1/1                                                                  | no metrics-server              |
-| Images         | `talent-ai/<service>:local` via `kind load`                          | no registry/digests            |
-| Datastores     | Postgres, MongoDB `rs0`, Redis, RabbitMQ, Qdrant in `talent-ai-data` | no external Compose dependency |
-| Storage        | `emptyDir`                                                           | no PVCs; data is ephemeral     |
-| CORS / cookies | `http://localhost:3000,3001`, `COOKIE_SECURE=false`                  | host-run portals over HTTP     |
-| Ingress        | left inert; `port-forward` instead                                   | no ingress controller          |
-| Cluster        | one control-plane node (`kind/kind-local.yaml`)                      | 8 GB laptops                   |
+| Change         | Local value                                                          | Reason                                                    |
+| :------------- | :------------------------------------------------------------------- | :-------------------------------------------------------- |
+| Replicas       | 1 per service                                                        | memory                                                    |
+| HPAs           | only `api-gateway` and `auth-service`, both pinned to 1/1            | other services do not need autoscaling                    |
+| Rollout        | `maxSurge: 0`, `maxUnavailable: 1`                                   | avoid temporary extra pods; brief downtime during updates |
+| Images         | `talent-ai/<service>:local` via `kind load`                          | no registry/digests                                       |
+| Datastores     | Postgres, MongoDB `rs0`, Redis, RabbitMQ, Qdrant in `talent-ai-data` | no external Compose dependency                            |
+| Storage        | `emptyDir`                                                           | no PVCs; data is ephemeral                                |
+| CORS / cookies | `http://localhost:3000,3001`, `COOKIE_SECURE=false`                  | host-run portals over HTTP                                |
+| Ingress        | left inert; `port-forward` instead                                   | no ingress controller                                     |
+| Cluster        | one control-plane node (`kind/kind-local.yaml`)                      | 8 GB laptops                                              |
 
 The local profile is intentionally **not** part of `pnpm k8s:validate`; the
 three environment overlays remain the validated artefacts. Because kindnet does

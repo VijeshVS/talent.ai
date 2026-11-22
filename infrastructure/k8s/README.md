@@ -63,13 +63,16 @@ What `up` does:
 5. deploys Postgres, MongoDB (single-node `rs0`), Redis, RabbitMQ and Qdrant in
    `talent-ai-data`
 6. runs Prisma migrations and the auth seed through port-forwarded datastores
-7. applies `overlays/local` (one replica per service, HPAs pinned to 1/1)
+7. applies `overlays/local` (one replica per service; HPAs only for the gateway
+   and auth service, pinned to 1/1; no rollout surge)
 8. port-forwards `api-gateway:8080` and `notification-service:5007`
 
 Requirements: Docker Desktop running with about 5 GB of memory, `kind`,
 `kubectl` and `pnpm`. The in-cluster datastores use the local credentials
 `talent` / `talent`. Datastore volumes are `emptyDir`, so data is lost when a
 datastore pod restarts; rerun `pnpm k8s:local:up` to migrate and seed again.
+Local application rollouts use `maxSurge: 0` and `maxUnavailable: 1`: updates
+may briefly interrupt a service, but do not need an extra pod's memory.
 
 The two portals are not part of the Helm chart. `--with-portals` runs them on
 the host with `VITE_API_GATEWAY_URL=http://localhost:8080` and
@@ -192,4 +195,3 @@ k8s/
   The local profile's datastores are `emptyDir` too.
 - Portal ingress rules live in `base/networking/ingress-portals.pending.yaml`
   and are intentionally not referenced.
-

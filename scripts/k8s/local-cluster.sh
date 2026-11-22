@@ -240,6 +240,12 @@ run_migrations() {
 
 apply_app() {
   log "applying the local application overlay"
+  # `kubectl apply` does not remove resources that disappeared from a Kustomize
+  # render. Clean up HPAs from the previous nine-HPA local profile explicitly.
+  kubectl -n "$APP_NAMESPACE" delete hpa \
+    talent-service recruiter-service engagement-service rewards-service \
+    ai-matching-service notification-service analytics-service \
+    --ignore-not-found >/dev/null
   kubectl apply -k "$LOCAL_OVERLAY"
 }
 
@@ -446,7 +452,8 @@ What `up` does:
   4. applies namespaces and the local Secret
   5. deploys Postgres, MongoDB, Redis, RabbitMQ and Qdrant in talent-ai-data
   6. runs Prisma migrations and the auth seed against port-forwarded datastores
-  7. applies the local overlay (one replica per service, HPAs pinned to 1/1)
+  7. applies the local overlay (one replica per service, HPAs only for gateway/auth,
+     no rollout surge)
   8. port-forwards api-gateway:8080 and notification-service:5007
   9. optionally starts the Vite portals on the host (--with-portals)
 
