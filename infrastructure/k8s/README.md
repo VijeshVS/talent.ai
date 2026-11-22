@@ -43,8 +43,9 @@ digests.
 ## Local single-node profile
 
 `overlays/local` is a laptop profile for kind. It inherits `dev` and adds
-in-cluster datastores, one replica per service, and locally built images. It is
-not part of `pnpm k8s:validate`.
+in-cluster datastores, one replica per service, locally built images, and the
+Prometheus/Grafana observability workloads. It is not part of
+`pnpm k8s:validate`.
 
 ```bash
 pnpm k8s:local:up                 # build, load, deploy, migrate, seed, port-forward
@@ -65,9 +66,10 @@ What `up` does:
 6. runs Prisma migrations and seeds auth roles
 7. seeds the deterministic synthetic demo dataset across PostgreSQL, MongoDB
    and Qdrant (RabbitMQ event publishing remains optional)
-8. applies `overlays/local` (one replica per service; HPAs only for the gateway
-   and auth service, pinned to 1/1; no rollout surge)
-9. port-forwards `api-gateway:8080` and `notification-service:5007`
+8. applies `overlays/local` (one replica per app service; only gateway/auth
+   HPAs, pinned to 1/1; no rollout surge) and starts Prometheus/Grafana
+9. port-forwards the API, notifications, Grafana (`localhost:3100`) and
+   Prometheus (`localhost:9090`)
 
 Requirements: Docker Desktop running with about 5 GB of memory, `kind`,
 `kubectl` and `pnpm`. The in-cluster datastores use the local credentials
@@ -76,6 +78,10 @@ datastore pod restarts; rerun `pnpm k8s:local:up` to migrate and seed again.
 The realistic seed uses synthetic accounts and is idempotent, so repeated starts
 upsert the same demo dataset instead of duplicating it. The default dataset has
 24 candidates; demo login details are in `tools/realistic-seeder/README.md`.
+Grafana is available at `http://localhost:3100` (`admin` / `admin`); Prometheus
+is at `http://localhost:9090`. Jaeger and datastore exporters are not included
+in the local Kubernetes profile. Grafana's Analytics PostgreSQL datasource is
+configured for the local in-cluster database.
 Local application rollouts use `maxSurge: 0` and `maxUnavailable: 1`: updates
 may briefly interrupt a service, but do not need an extra pod's memory.
 

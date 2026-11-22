@@ -1,0 +1,30 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Reuse the Phase 11 Prometheus/Grafana workloads with local datasource
+# settings. The runner creates the dashboard and alert-rule ConfigMaps before
+# applying this overlay.
+namespace: talent-ai
+
+resources:
+  - ../../../observability
+
+labels:
+  - pairs:
+      app.kubernetes.io/managed-by: kustomize
+      app.kubernetes.io/part-of: talent-ai
+    includeSelectors: false
+
+patches:
+  - path: prometheus-local-patch.yaml
+    target:
+      kind: ConfigMap
+      name: talent-ai-prometheus-config
+  - path: prometheus-deployment-local-patch.yaml
+    target:
+      kind: Deployment
+      name: prometheus
+  - path: grafana-local-patch.yaml
+    target:
+      kind: Deployment
+      name: grafana

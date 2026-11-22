@@ -13,6 +13,7 @@ resources:
   - mongo-init-job.yaml
   - networkpolicy-mongodb-init.yaml
   - networkpolicy-mongodb-init-ingress.yaml
+  - networkpolicy-grafana-postgres.yaml
   - redis.yaml
   - rabbitmq.yaml
   - qdrant.yaml
