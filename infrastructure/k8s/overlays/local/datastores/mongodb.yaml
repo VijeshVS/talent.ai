@@ -9,6 +9,10 @@ metadata:
     app.kubernetes.io/name: mongodb
 spec:
   replicas: 1
+  # This single-node datastore is ephemeral; avoid overlapping mongod pods on
+  # updates and keep local-cluster memory use predictable.
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app.kubernetes.io/name: mongodb
@@ -42,6 +46,8 @@ spec:
                 - db.adminCommand('ping')
             initialDelaySeconds: 10
             periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 6
           volumeMounts:
             - name: data
               mountPath: /data/db
@@ -54,6 +60,23 @@ kind: Service
 metadata:
   name: mongodb
 spec:
+  selector:
+    app.kubernetes.io/name: mongodb
+  ports:
+    - name: mongodb
+      port: 27017
+      targetPort: 27017
+---
+# Bootstrap-only address: the init Job must reach mongod before the normal
+# Service sees it as Ready, because readiness is checked while the replica set
+# is being initialised. Application clients continue using the ready-gated
+# `mongodb` Service above.
+apiVersion: v1
+kind: Service
+metadata:
+  name: mongodb-bootstrap
+spec:
+  publishNotReadyAddresses: true
   selector:
     app.kubernetes.io/name: mongodb
   ports:

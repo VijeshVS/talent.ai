@@ -15,11 +15,12 @@ spec:
           command: ['bash', '-c']
           args:
             - |
-              until mongosh --host mongodb --quiet --eval 'db.adminCommand("ping")' >/dev/null 2>&1; do
+              MONGODB_DIRECT_URI='mongodb://mongodb-bootstrap:27017/?directConnection=true'
+              until mongosh "$MONGODB_DIRECT_URI" --quiet --eval 'db.adminCommand("ping")' >/dev/null 2>&1; do
                 echo "waiting for mongodb"
                 sleep 2
               done
-              mongosh --host mongodb --quiet --eval '
+              mongosh "$MONGODB_DIRECT_URI" --quiet --eval '
                 try {
                   rs.status();
                 } catch (e) {
@@ -34,8 +35,8 @@ spec:
               '
           resources:
             requests:
-              cpu: 50m
-              memory: 64Mi
+              cpu: 100m
+              memory: 128Mi
             limits:
-              cpu: 200m
-              memory: 256Mi
+              cpu: 500m
+              memory: 512Mi
