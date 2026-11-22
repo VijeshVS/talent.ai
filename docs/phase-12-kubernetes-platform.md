@@ -594,7 +594,7 @@ the whole stack. `overlays/local` is an additive, local-only profile for a
 single-node kind cluster on a laptop:
 
 ```bash
-pnpm k8s:local:up                 # one command: build, load, deploy, migrate
+pnpm k8s:local:up                 # build, load, deploy, migrate, seed demo data
 pnpm k8s:local:up --with-portals  # also run the Vite portals on the host
 pnpm k8s:local:status
 pnpm k8s:local:down

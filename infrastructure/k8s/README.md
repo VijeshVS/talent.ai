@@ -47,7 +47,7 @@ in-cluster datastores, one replica per service, and locally built images. It is
 not part of `pnpm k8s:validate`.
 
 ```bash
-pnpm k8s:local:up                 # build, load, deploy, migrate, port-forward
+pnpm k8s:local:up                 # build, load, deploy, migrate, seed, port-forward
 pnpm k8s:local:up --with-portals  # also start the Vite portals on the host
 pnpm k8s:local:status
 pnpm k8s:local:logs api-gateway
@@ -62,15 +62,20 @@ What `up` does:
 4. applies the namespaces and creates `Secret/talent-ai-secrets`
 5. deploys Postgres, MongoDB (single-node `rs0`), Redis, RabbitMQ and Qdrant in
    `talent-ai-data`
-6. runs Prisma migrations and the auth seed through port-forwarded datastores
-7. applies `overlays/local` (one replica per service; HPAs only for the gateway
+6. runs Prisma migrations and seeds auth roles
+7. seeds the deterministic synthetic demo dataset across PostgreSQL, MongoDB
+   and Qdrant (RabbitMQ event publishing remains optional)
+8. applies `overlays/local` (one replica per service; HPAs only for the gateway
    and auth service, pinned to 1/1; no rollout surge)
-8. port-forwards `api-gateway:8080` and `notification-service:5007`
+9. port-forwards `api-gateway:8080` and `notification-service:5007`
 
 Requirements: Docker Desktop running with about 5 GB of memory, `kind`,
 `kubectl` and `pnpm`. The in-cluster datastores use the local credentials
 `talent` / `talent`. Datastore volumes are `emptyDir`, so data is lost when a
 datastore pod restarts; rerun `pnpm k8s:local:up` to migrate and seed again.
+The realistic seed uses synthetic accounts and is idempotent, so repeated starts
+upsert the same demo dataset instead of duplicating it. The default dataset has
+24 candidates; demo login details are in `tools/realistic-seeder/README.md`.
 Local application rollouts use `maxSurge: 0` and `maxUnavailable: 1`: updates
 may briefly interrupt a service, but do not need an extra pod's memory.
 
