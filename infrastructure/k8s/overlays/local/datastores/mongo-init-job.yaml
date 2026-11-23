@@ -15,7 +15,7 @@ spec:
           command: ['bash', '-c']
           args:
             - |
-              MONGODB_DIRECT_URI='mongodb://mongodb-bootstrap:27017/?directConnection=true'
+              MONGODB_DIRECT_URI='mongodb://mongodb-headless.talent-ai-data.svc.cluster.local:27017/?directConnection=true'
               until mongosh "$MONGODB_DIRECT_URI" --quiet --eval 'db.adminCommand("ping")' >/dev/null 2>&1; do
                 echo "waiting for mongodb"
                 sleep 2
@@ -28,10 +28,20 @@ spec:
                     _id: "rs0",
                     members: [{
                       _id: 0,
-                      host: "mongodb.talent-ai-data.svc.cluster.local:27017"
+                      host: "mongodb-headless.talent-ai-data.svc.cluster.local:27017"
                     }]
                   });
                 }
+
+                const deadline = Date.now() + 120000;
+                while (Date.now() < deadline) {
+                  if (db.hello().isWritablePrimary) {
+                    print("replica set primary ready");
+                    quit(0);
+                  }
+                  sleep(2000);
+                }
+                throw new Error("replica set primary was not ready after 120s");
               '
           resources:
             requests:
