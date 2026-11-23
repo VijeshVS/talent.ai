@@ -143,15 +143,15 @@ schema is a failure, not a skip.
 
 ## 5. Object inventory
 
-Rendered by `overlays/production` (81 objects):
+Rendered by `overlays/production` (85 objects):
 
 | Scope                |  Count | Objects                                                                                                                                                 |
 | :------------------- | -----: | :------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `talent-ai`          |     66 | 9 Deployment, 9 Service, 9 HPA, 9 PDB, 1 ResourceQuota, 1 LimitRange, 9 ServiceAccount, 2 Role, 2 RoleBinding, 1 ConfigMap, 1 Ingress, 13 NetworkPolicy |
+| `talent-ai`          |     70 | 9 Deployment, 9 Service, 9 HPA, 9 PDB, 1 ResourceQuota, 1 LimitRange, 9 ServiceAccount, 2 Role, 2 RoleBinding, 1 ConfigMap, 1 Ingress, 17 NetworkPolicy |
 | `talent-ai-platform` |      4 | 1 ServiceAccount, 1 Role, 1 RoleBinding, 1 NetworkPolicy                                                                                                |
 | `talent-ai-data`     |      6 | 1 Role, 1 RoleBinding, 4 NetworkPolicy                                                                                                                  |
 | Cluster-scoped       |      5 | 3 Namespace, 2 PriorityClass                                                                                                                            |
-| **Total**            | **81** |                                                                                                                                                         |
+| **Total**            | **85** |                                                                                                                                                         |
 
 The **38 core namespaced objects** are the application and policy set:
 
@@ -164,7 +164,7 @@ The `Namespace` objects are cluster-scoped and tracked separately from that
 count. Identity, configuration, ingress and network-policy objects are counted
 in the table above but excluded from the "38" figure.
 
-`dev` renders 72 objects: the 9 PDBs are removed.
+`dev` renders 76 objects: the 9 PDBs are removed.
 
 ---
 
@@ -339,7 +339,7 @@ Every policy is directional and uses concrete label selectors. There is no
 `ipBlock` anywhere, therefore no `0.0.0.0/0` egress. Default deny applies to
 ingress and egress in all three namespaces.
 
-`talent-ai` (13 policies):
+`talent-ai` (17 policies):
 
 | Policy                                  | Direction | Selector                       | Allows                                                                                                                                                              |
 | :-------------------------------------- | :-------- | :----------------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -350,6 +350,10 @@ ingress and egress in all three namespaces.
 | `allow-ingress-controller-notification` | Ingress   | `name: notification-service`   | `ingress-nginx` ns, TCP 5007                                                                                                                                        |
 | `allow-gateway-egress`                  | Egress    | `name: api-gateway`            | `component: backend`, TCP 5001–5008                                                                                                                                 |
 | `allow-gateway-to-backends`             | Ingress   | `component: backend`           | `name: api-gateway`, TCP 5001–5008                                                                                                                                  |
+| `allow-ai-matching-to-rewards-egress`   | Egress    | `name: ai-matching-service`    | `name: rewards-service`, TCP 5005                                                                                                                                   |
+| `allow-ai-matching-to-rewards-ingress`  | Ingress   | `name: rewards-service`        | `name: ai-matching-service`, TCP 5005                                                                                                                               |
+| `allow-talent-to-engagement-egress`     | Egress    | `name: talent-service`         | `name: engagement-service`, TCP 5004                                                                                                                                |
+| `allow-talent-to-engagement-ingress`    | Ingress   | `name: engagement-service`     | `name: talent-service`, TCP 5004                                                                                                                                    |
 | `allow-prometheus-scrape`               | Ingress   | `component in (backend, edge)` | `name: prometheus`, TCP 5001–5008 + 8080                                                                                                                            |
 | `allow-prometheus-egress`               | Egress    | `name: prometheus`             | app `/metrics`; `name in (postgres-exporter, redis-exporter, mongodb-exporter, rabbitmq, qdrant)` on 9187/9121/9216/15692/6333, in `talent-ai` and `talent-ai-data` |
 | `allow-grafana-egress`                  | Egress    | `name: grafana`                | `name: prometheus` 9090; `name: postgres` 5432, in `talent-ai` and `talent-ai-data`                                                                                 |
