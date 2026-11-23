@@ -1,7 +1,6 @@
-# Allows the one-shot replica-set initialiser to reach mongod. The data
-# namespace default-denies egress, so this is required on a policy-capable CNI
-# (kindnet does not enforce NetworkPolicy, but the rule keeps the profile
-# correct if the CNI is swapped).
+# Allows the one-shot replica-set initialiser to resolve the bootstrap Service
+# and reach mongod. This namespace may already have default-deny policies on a
+# repeated local start, so the required egress paths are explicit here.
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -13,6 +12,18 @@ spec:
   policyTypes:
     - Egress
   egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
     - to:
         - podSelector:
             matchLabels:

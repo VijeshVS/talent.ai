@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # talent.ai — one-command local Kubernetes environment.
 #
-#   pnpm k8s:local:up                 # build, load, deploy, migrate, port-forward
+#   pnpm k8s:local:up                 # build, load, deploy, migrate, seed, port-forward
 #   pnpm k8s:local:up --with-portals  # also start the Vite portals on the host
 #   pnpm k8s:local:up --no-build      # reuse images already loaded into kind
 #   pnpm k8s:local:status
@@ -45,7 +45,7 @@ for service in "${SERVICES[@]}"; do
   IMAGES+=("talent-ai/${service}:local")
 done
 
-MIGRATION_PIDS=()
+STORE_FORWARD_PIDS=()
 
 log() { printf '\033[1;34m==>\033[0m %s\n' "$*"; }
 warn() { printf '\033[1;33mwarning:\033[0m %s\n' "$*" >&2; }
@@ -54,15 +54,15 @@ die() {
   exit 1
 }
 
-cleanup_migrations() {
+cleanup_store_forwards() {
   local pid
-  if (( ${#MIGRATION_PIDS[@]} > 0 )); then
-    for pid in "${MIGRATION_PIDS[@]}"; do
+  if (( ${#STORE_FORWARD_PIDS[@]} > 0 )); then
+    for pid in "${STORE_FORWARD_PIDS[@]}"; do
       kill "$pid" 2>/dev/null || true
     done
   fi
 }
-trap cleanup_migrations EXIT
+trap cleanup_store_forwards EXIT
 
 require_tools() {
   local missing=()
@@ -170,6 +170,8 @@ ensure_secret() {
     --from-literal=ENGAGEMENT_DATABASE_URL="${pg}/talent_engagement"
     --from-literal=REWARDS_DATABASE_URL="${pg}/talent_rewards"
     --from-literal=ANALYTICS_DATABASE_URL="${pg}/talent_analytics?schema=public"
+    --from-literal=ANALYTICS_DB_USER=talent
+    --from-literal=ANALYTICS_DB_PASSWORD=talent
     --from-literal=MONGODB_URI="${mongo}/talent_profiles?replicaSet=rs0"
     --from-literal=NOTIFICATION_MONGODB_URI="${mongo}/talent_notif?replicaSet=rs0"
     --from-literal=REDIS_URL="redis://redis.${DATA_NAMESPACE}.svc.cluster.local:6379"
@@ -196,23 +198,35 @@ wait_for_datastores() {
   kubectl -n "$DATA_NAMESPACE" wait --for=condition=complete job/mongodb-init --timeout=240s
 }
 
-run_migrations() {
+run_migrations_and_seed() {
   require_free_port 5432 "postgres (migrations)"
   require_free_port 27017 "mongodb (migrations)"
+  require_free_port 6333 "qdrant (realistic seed)"
+  require_free_port 5672 "rabbitmq (realistic seed)"
 
-  log "port-forwarding Postgres and MongoDB for migrations"
+  log "port-forwarding Postgres, MongoDB, Qdrant and RabbitMQ for migrations/seed"
   kubectl -n "$DATA_NAMESPACE" port-forward svc/postgres 5432:5432 >"$STATE_DIR/migrate-postgres.log" 2>&1 &
   local pg_pid=$!
-  MIGRATION_PIDS+=("$pg_pid")
+  STORE_FORWARD_PIDS+=("$pg_pid")
   kubectl -n "$DATA_NAMESPACE" port-forward svc/mongodb 27017:27017 >"$STATE_DIR/migrate-mongodb.log" 2>&1 &
   local mongo_pid=$!
-  MIGRATION_PIDS+=("$mongo_pid")
+  STORE_FORWARD_PIDS+=("$mongo_pid")
+  kubectl -n "$DATA_NAMESPACE" port-forward svc/qdrant 6333:6333 >"$STATE_DIR/seed-qdrant.log" 2>&1 &
+  local qdrant_pid=$!
+  STORE_FORWARD_PIDS+=("$qdrant_pid")
+  kubectl -n "$DATA_NAMESPACE" port-forward svc/rabbitmq 5672:5672 >"$STATE_DIR/seed-rabbitmq.log" 2>&1 &
+  local rabbitmq_pid=$!
+  STORE_FORWARD_PIDS+=("$rabbitmq_pid")
 
   wait_for_port 127.0.0.1 5432 60
   wait_for_port 127.0.0.1 27017 60
+  wait_for_port 127.0.0.1 6333 60
+  wait_for_port 127.0.0.1 5672 60
 
   local pg="postgresql://talent:talent@127.0.0.1:5432"
   local mongo="mongodb://127.0.0.1:27017"
+  local qdrant="http://127.0.0.1:6333"
+  local rabbitmq="amqp://talent:talent@127.0.0.1:5672"
 
   log "running Prisma migrations"
   DATABASE_URL="${pg}/talent_auth" \
@@ -234,11 +248,47 @@ run_migrations() {
   log "seeding the auth database"
   DATABASE_URL="${pg}/talent_auth" pnpm db:auth:seed
 
-  kill "$pg_pid" "$mongo_pid" 2>/dev/null || true
-  MIGRATION_PIDS=()
+  log "seeding realistic demo data across the local datastores"
+  NODE_ENV=development \
+    DATABASE_URL="${pg}/talent_auth" \
+    RECRUITER_DATABASE_URL="${pg}/talent_recruiter?schema=public" \
+    ENGAGEMENT_DATABASE_URL="${pg}/talent_engagement?schema=public" \
+    REWARDS_DATABASE_URL="${pg}/talent_rewards?schema=public" \
+    ANALYTICS_DATABASE_URL="${pg}/talent_analytics?schema=public" \
+    MONGODB_URI="${mongo}/talent_profiles?directConnection=true" \
+    NOTIFICATION_MONGODB_URI="${mongo}/talent_notif?directConnection=true" \
+    QDRANT_URL="$qdrant" \
+    QDRANT_COLLECTION=talent_profiles \
+    EMBEDDING_DIMENSIONS=384 \
+    QDRANT_API_KEY= \
+    RABBITMQ_URL="$rabbitmq" \
+  pnpm db:seed:realistic
+
+  cleanup_store_forwards
+  STORE_FORWARD_PIDS=()
+}
+
+apply_observability_configmaps() {
+  log "provisioning Grafana dashboards and Prometheus rules"
+  kubectl -n "$APP_NAMESPACE" create configmap talent-ai-grafana-dashboards \
+    --from-file=infrastructure/docker/grafana/dashboards/talent-platform-overview.json \
+    --from-file=infrastructure/docker/grafana/dashboards/talent-service-health.json \
+    --from-file=infrastructure/docker/grafana/dashboards/talent-conversion-funnels.json \
+    --from-file=infrastructure/docker/grafana/dashboards/talent-ai-talentlens.json \
+    --from-file=infrastructure/docker/grafana/dashboards/talent-events-rabbitmq.json \
+    --from-file=infrastructure/docker/grafana/dashboards/talent-rewards-notifications-analytics.json \
+    --dry-run=client -o yaml | kubectl apply -f - >/dev/null
+  kubectl -n "$APP_NAMESPACE" create configmap talent-ai-prometheus-rules \
+    --from-file=infrastructure/docker/prometheus/rules/talent-ai.yml \
+    --dry-run=client -o yaml | kubectl apply -f - >/dev/null
 }
 
 apply_app() {
+  local restart_observability="no"
+  if kubectl -n "$APP_NAMESPACE" get deployment prometheus >/dev/null 2>&1; then
+    restart_observability="yes"
+  fi
+
   log "applying the local application overlay"
   # `kubectl apply` does not remove resources that disappeared from a Kustomize
   # render. Clean up HPAs from the previous nine-HPA local profile explicitly.
@@ -246,12 +296,28 @@ apply_app() {
     talent-service recruiter-service engagement-service rewards-service \
     ai-matching-service notification-service analytics-service \
     --ignore-not-found >/dev/null
+  apply_observability_configmaps
   kubectl apply -k "$LOCAL_OVERLAY"
+  if [[ "$restart_observability" == "yes" ]]; then
+    kubectl -n "$APP_NAMESPACE" rollout restart deployment/prometheus deployment/grafana >/dev/null
+  fi
 }
 
 wait_for_app() {
   local service
   for service in "${SERVICES[@]}"; do
+    log "waiting for $service"
+    if ! kubectl -n "$APP_NAMESPACE" rollout status "deploy/$service" --timeout=300s; then
+      kubectl -n "$APP_NAMESPACE" get pods -o wide || true
+      kubectl -n "$APP_NAMESPACE" describe "deploy/$service" | tail -40 || true
+      die "$service did not become ready"
+    fi
+  done
+}
+
+wait_for_observability() {
+  local service
+  for service in prometheus grafana; do
     log "waiting for $service"
     if ! kubectl -n "$APP_NAMESPACE" rollout status "deploy/$service" --timeout=300s; then
       kubectl -n "$APP_NAMESPACE" get pods -o wide || true
@@ -268,15 +334,23 @@ start_port_forwards() {
 
   require_free_port 8080 "api-gateway"
   require_free_port 5007 "notification-service"
+  require_free_port 3100 "Grafana"
+  require_free_port 9090 "Prometheus"
 
-  log "port-forwarding api-gateway:8080 and notification-service:5007"
+  log "port-forwarding app services, Grafana and Prometheus"
   kubectl -n "$APP_NAMESPACE" port-forward svc/api-gateway 8080:8080 >"$STATE_DIR/port-forward-api-gateway.log" 2>&1 &
   start_pidfile_entry port-forwards $!
   kubectl -n "$APP_NAMESPACE" port-forward svc/notification-service 5007:5007 >"$STATE_DIR/port-forward-notification.log" 2>&1 &
   start_pidfile_entry port-forwards $!
+  kubectl -n "$APP_NAMESPACE" port-forward svc/grafana 3100:3000 >"$STATE_DIR/port-forward-grafana.log" 2>&1 &
+  start_pidfile_entry port-forwards $!
+  kubectl -n "$APP_NAMESPACE" port-forward svc/prometheus 9090:9090 >"$STATE_DIR/port-forward-prometheus.log" 2>&1 &
+  start_pidfile_entry port-forwards $!
 
   wait_for_port 127.0.0.1 8080 30
   wait_for_port 127.0.0.1 5007 30
+  wait_for_port 127.0.0.1 3100 30
+  wait_for_port 127.0.0.1 9090 30
 }
 
 start_portals() {
@@ -306,6 +380,8 @@ Local Kubernetes environment is ready.
 
   API gateway    http://localhost:8080
   Notification   ws://localhost:5007/ws/notifications
+  Grafana        http://localhost:3100 (admin / admin)
+  Prometheus     http://localhost:9090
 EOF
   if [[ "$with_portals" == "yes" ]]; then
     cat <<EOF
@@ -370,9 +446,10 @@ cmd_up() {
   kubectl apply -k "$DATA_OVERLAY"
 
   wait_for_datastores
-  run_migrations
+  run_migrations_and_seed
   apply_app
   wait_for_app
+  wait_for_observability
   start_port_forwards
   if [[ "$with_portals" == "yes" ]]; then start_portals; fi
 
@@ -422,6 +499,8 @@ cmd_status() {
   echo "local endpoints:"
   echo "  api-gateway        http://localhost:8080"
   echo "  notification (ws)  ws://localhost:5007/ws/notifications"
+  echo "  Grafana            http://localhost:3100"
+  echo "  Prometheus         http://localhost:9090"
   echo "  candidate portal   http://localhost:3000"
   echo "  recruiter portal   http://localhost:3001"
 }
@@ -451,11 +530,12 @@ What `up` does:
   3. loads the images into kind
   4. applies namespaces and the local Secret
   5. deploys Postgres, MongoDB, Redis, RabbitMQ and Qdrant in talent-ai-data
-  6. runs Prisma migrations and the auth seed against port-forwarded datastores
-  7. applies the local overlay (one replica per service, HPAs only for gateway/auth,
-     no rollout surge)
-  8. port-forwards api-gateway:8080 and notification-service:5007
-  9. optionally starts the Vite portals on the host (--with-portals)
+  6. runs Prisma migrations and seeds auth roles
+  7. writes realistic synthetic data to PostgreSQL, MongoDB and Qdrant
+  8. applies the local overlay with the nine app services and observability
+  9. waits for app, Prometheus and Grafana deployments
+ 10. port-forwards the API, notifications, Grafana and Prometheus
+ 11. optionally starts the Vite portals on the host (--with-portals)
 
 Requirements: Docker Desktop (running), kind, kubectl, pnpm.
 EOF

@@ -594,7 +594,7 @@ the whole stack. `overlays/local` is an additive, local-only profile for a
 single-node kind cluster on a laptop:
 
 ```bash
-pnpm k8s:local:up                 # one command: build, load, deploy, migrate
+pnpm k8s:local:up                 # build, load, deploy, migrate, seed demo data
 pnpm k8s:local:up --with-portals  # also run the Vite portals on the host
 pnpm k8s:local:status
 pnpm k8s:local:down
@@ -604,11 +604,12 @@ The overlay inherits `dev` and changes only what a laptop needs:
 
 | Change         | Local value                                                          | Reason                                                    |
 | :------------- | :------------------------------------------------------------------- | :-------------------------------------------------------- |
-| Replicas       | 1 per service                                                        | memory                                                    |
+| Replicas       | 1 per app service                                                    | memory                                                    |
 | HPAs           | only `api-gateway` and `auth-service`, both pinned to 1/1            | other services do not need autoscaling                    |
 | Rollout        | `maxSurge: 0`, `maxUnavailable: 1`                                   | avoid temporary extra pods; brief downtime during updates |
 | Images         | `talent-ai/<service>:local` via `kind load`                          | no registry/digests                                       |
 | Datastores     | Postgres, MongoDB `rs0`, Redis, RabbitMQ, Qdrant in `talent-ai-data` | no external Compose dependency                            |
+| Observability  | Prometheus and Grafana; forwarded on `:9090` and `:3100`             | local metrics and dashboards                              |
 | Storage        | `emptyDir`                                                           | no PVCs; data is ephemeral                                |
 | CORS / cookies | `http://localhost:3000,3001`, `COOKIE_SECURE=false`                  | host-run portals over HTTP                                |
 | Ingress        | left inert; `port-forward` instead                                   | no ingress controller                                     |

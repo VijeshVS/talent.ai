@@ -1,0 +1,16 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: grafana
+spec:
+  strategy:
+    type: Recreate
+  template:
+    spec:
+      containers:
+        - name: grafana
+          env:
+            - name: ANALYTICS_DB_HOST
+              value: postgres.talent-ai-data.svc.cluster.local
+            - name: ANALYTICS_DB_SSLMODE
+              value: disable
