@@ -2,8 +2,11 @@
 #
 # The base ConfigMap targets a cluster where the datastores live in
 # talent-ai-data and the portals are served from production origins. Locally
-# the datastores still live in talent-ai-data (same DNS), but the portals run
-# on the host over plain HTTP, so CORS/cookies/proxy trust must change.
+# the datastores still live in talent-ai-data (same DNS), while local services
+# use development mode and the portals run on the host over plain HTTP.
+- op: replace
+  path: /data/NODE_ENV
+  value: development
 - op: replace
   path: /data/QDRANT_URL
   value: http://qdrant.talent-ai-data.svc.cluster.local:6333

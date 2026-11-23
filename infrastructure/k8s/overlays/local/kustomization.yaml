@@ -12,6 +12,7 @@ kind: Kustomization
 #   - no rollout surge (allow one pod to be unavailable during local updates)
 #   - images built locally (`docker compose build`) and loaded into kind
 #   - in-cluster datastores in talent-ai-data (no external dependencies)
+#   - Prometheus and Grafana in the talent-ai namespace
 #   - localhost CORS/cookie settings for the host-run portals
 #
 # Run it with `pnpm k8s:local:up` (see scripts/k8s/local-cluster.sh).
@@ -19,6 +20,7 @@ kind: Kustomization
 resources:
   - ../dev
   - datastores
+  - observability
 
 images:
   - name: ghcr.io/vijeshvs/smart-match/api-gateway

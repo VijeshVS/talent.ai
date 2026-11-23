@@ -1,0 +1,20 @@
+# Permit only the local replica-set init Job to reach MongoDB. On a repeated
+# local start, the base data-default-deny ingress policy is already active.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-mongodb-init-ingress
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: mongodb
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              job-name: mongodb-init
+      ports:
+        - protocol: TCP
+          port: 27017
