@@ -143,6 +143,96 @@ spec:
         - protocol: TCP
           port: 5008
 ---
+# The AI matching service calls Rewards to charge/refund TalentLens queries.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-ai-matching-to-rewards-egress
+  namespace: talent-ai
+  labels:
+    app.kubernetes.io/part-of: talent-ai
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: ai-matching-service
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: rewards-service
+      ports:
+        - protocol: TCP
+          port: 5005
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-ai-matching-to-rewards-ingress
+  namespace: talent-ai
+  labels:
+    app.kubernetes.io/part-of: talent-ai
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: rewards-service
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: ai-matching-service
+      ports:
+        - protocol: TCP
+          port: 5005
+---
+# Talent uses Engagement to exclude previously reviewed candidates.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-talent-to-engagement-egress
+  namespace: talent-ai
+  labels:
+    app.kubernetes.io/part-of: talent-ai
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: talent-service
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: engagement-service
+      ports:
+        - protocol: TCP
+          port: 5004
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-talent-to-engagement-ingress
+  namespace: talent-ai
+  labels:
+    app.kubernetes.io/part-of: talent-ai
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: engagement-service
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: talent-service
+      ports:
+        - protocol: TCP
+          port: 5004
+---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
