@@ -271,12 +271,7 @@ run_migrations_and_seed() {
 apply_observability_configmaps() {
   log "provisioning Grafana dashboards and Prometheus rules"
   kubectl -n "$APP_NAMESPACE" create configmap talent-ai-grafana-dashboards \
-    --from-file=infrastructure/docker/grafana/dashboards/talent-platform-overview.json \
     --from-file=infrastructure/docker/grafana/dashboards/talent-service-health.json \
-    --from-file=infrastructure/docker/grafana/dashboards/talent-conversion-funnels.json \
-    --from-file=infrastructure/docker/grafana/dashboards/talent-ai-talentlens.json \
-    --from-file=infrastructure/docker/grafana/dashboards/talent-events-rabbitmq.json \
-    --from-file=infrastructure/docker/grafana/dashboards/talent-rewards-notifications-analytics.json \
     --dry-run=client -o yaml | kubectl apply -f - >/dev/null
   kubectl -n "$APP_NAMESPACE" create configmap talent-ai-prometheus-rules \
     --from-file=infrastructure/docker/prometheus/rules/talent-ai.yml \

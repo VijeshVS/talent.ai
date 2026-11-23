@@ -486,7 +486,7 @@ function serviceHealth() {
 
   return dashboard('talent-service-health', 'talent.ai — Service Health, RED & Saturation', {
     description:
-      'Per-service RED metrics, Node process saturation, exporter connectivity and the slowest routes.',
+      'Per-service RED metrics, Node process saturation, Qdrant health and the slowest routes.',
     variables: [environmentVariable, serviceVariable, routeVariable, statusVariable, rangeVariable],
     panels: [
       statPanel({
@@ -637,57 +637,9 @@ function serviceHealth() {
         ],
       }),
       statPanel({
-        id: next(),
-        title: 'PostgreSQL up',
-        grid: { x: 0, y: 21, w: 3, h: 5 },
-        unit: 'short',
-        decimals: 0,
-        targets: [target('min(pg_up{env=~"$env"})', 'pg_up')],
-        steps: [
-          ['red', null],
-          ['green', 1],
-        ],
-      }),
-      statPanel({
-        id: next(),
-        title: 'Redis up',
-        grid: { x: 3, y: 21, w: 3, h: 5 },
-        unit: 'short',
-        decimals: 0,
-        targets: [target('min(redis_up{env=~"$env"})', 'redis_up')],
-        steps: [
-          ['red', null],
-          ['green', 1],
-        ],
-      }),
-      statPanel({
-        id: next(),
-        title: 'MongoDB up',
-        grid: { x: 6, y: 21, w: 3, h: 5 },
-        unit: 'short',
-        decimals: 0,
-        targets: [target('min(mongodb_up{env=~"$env"})', 'mongodb_up')],
-        steps: [
-          ['red', null],
-          ['green', 1],
-        ],
-      }),
-      statPanel({
-        id: next(),
-        title: 'RabbitMQ up',
-        grid: { x: 9, y: 21, w: 3, h: 5 },
-        unit: 'short',
-        decimals: 0,
-        targets: [target('min(up{job="rabbitmq",env=~"$env"})', 'rabbitmq')],
-        steps: [
-          ['red', null],
-          ['green', 1],
-        ],
-      }),
-      statPanel({
-        id: next(),
+        id: 115,
         title: 'Qdrant up',
-        grid: { x: 12, y: 21, w: 3, h: 5 },
+        grid: { x: 0, y: 21, w: 4, h: 5 },
         unit: 'short',
         decimals: 0,
         targets: [target('min(up{job="qdrant",env=~"$env"})', 'qdrant')],
@@ -696,18 +648,10 @@ function serviceHealth() {
           ['green', 1],
         ],
       }),
-      statPanel({
-        id: next(),
-        title: 'Active DB connections',
-        grid: { x: 15, y: 21, w: 4, h: 5 },
-        unit: 'short',
-        decimals: 0,
-        targets: [target('sum(pg_stat_activity_count{env=~"$env",state="active"})', 'active')],
-      }),
       tablePanel({
-        id: next(),
+        id: 117,
         title: 'Slowest routes (p95)',
-        grid: { x: 19, y: 21, w: 5, h: 8 },
+        grid: { x: 4, y: 21, w: 20, h: 8 },
         unit: 's',
         targets: [
           target(
