@@ -1,10 +1,3 @@
-# Single-node kind cluster for the local profile.
-#
-# The Phase 12 kind config uses one control-plane and two workers for the CI
-# server-side dry-run. A laptop running the full stack needs the capacity for
-# the nine services plus five datastores, so the local profile uses one node.
-#
-# kindnet does not enforce NetworkPolicy; the policies are declarative here.
 kind: Cluster
 apiVersion: kind.x-k8s.io/v1alpha4
 name: talent-ai-local
